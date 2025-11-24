@@ -1,0 +1,18 @@
+﻿{
+  "$schema": "https://raw.githubusercontent.com/bsmg/BSIPA-MetadataFileSchema/master/Schema.json",
+  "id": "SaberSurgeon",
+  "name": "SaberSurgeon",
+  "author": "PhoenixBlaze0",
+  "version": "0.0.1",
+  "description": "A Beat Saber Mod that does mod stuff",
+  "gameVersion": "1.40.8",
+  "dependsOn": {
+    "BSIPA": "^4.3.6",
+    "BeatSaberMarkupLanguage": "^1.12.5"
+  },
+  "loadAfter": [
+    "SongCore",
+    "CatCore",
+    "ChatPlexSDK_BS"
+  ]
+}
