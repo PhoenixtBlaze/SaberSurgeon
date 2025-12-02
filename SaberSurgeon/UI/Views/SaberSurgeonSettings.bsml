@@ -1,29 +1,110 @@
-﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
-	<vertical vertical-fit="PreferredSize" spacing="2" pad="2">
-		
-		<!-- Slider Setting -->
-		<slider-setting
-            text="Play Time (minutes)"
-            value="playTime"
-            min="5"
-            max="120"
-            increment="1"
-            apply-on-change="true"
-        />
-		
-		
-		<!-- Play Button -->
-		<button
-            text="Start / Play"
-            on-click="OnStartPlayPressed"
-            font-size="8"
-            pref-width="60"
-            pref-height="12"
-            bg-color="#2D8FFF"
-            text-color="#FFFFFF"
-            hover-color="#4DA6FF"
-            outline-color="#FFFFFF"
-            outline-width="0.6"
-        />
-	</vertical>
+﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+    xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
+
+	<horizontal spacing="5" pad="2">
+
+		<!-- LEFT: main SaberSurgeon controls -->
+		<vertical vertical-fit="PreferredSize" spacing="2" pad="2">
+
+			<!-- Command toggles row: Rainbow + DA side by side -->
+			<horizontal spacing="1" pad="0" horizontal-fit="PreferredSize">
+				<!-- Rainbow -->
+				<button id="rainbowbutton"
+						on-click="OnRainbowButtonClicked"
+						pref-width="15"
+						pref-height="15"
+						hover-hint="Enable/Disable Rainbow Command">
+					<image id="rainbowicon"
+						   preserve-aspect="true"
+						   pref-width="13"
+						   pref-height="13" />
+				</button>
+
+				<!-- Disappearing Arrows -->
+				<button id="dabutton"
+						on-click="OnDAButtonClicked"
+						pref-width="15"
+						pref-height="15"
+						hover-hint="Enable/Disable Disappearing Arrows Command">
+					<image id="daicon"
+						   preserve-aspect="true"
+						   pref-width="13"
+						   pref-height="13" />
+				</button>
+				
+				<!-- Ghost Notes -->
+				<button id="ghostbutton"
+						on-click="OnGhostButtonClicked"
+						pref-width="15"
+						pref-height="15"
+						hover-hint="Enable/Disable Ghost Notes Command">
+					<image id="ghosticon"
+						   preserve-aspect="true"
+						   pref-width="13"
+						   pref-height="13" />
+				</button>
+			</horizontal>
+			
+
+			<!-- Play Time Slider -->
+			<slider-setting
+                text="Play Time (minutes)"
+                value="playTime"
+                min="5"
+                max="120"
+                increment="1"
+                apply-on-change="true" />
+
+			<!-- Start / Play Button -->
+			<button
+                text="Start / Play"
+                on-click="OnStartPlayPressed"
+                font-size="8"
+                pref-width="60"
+                pref-height="12"
+                bg-color="#2D8FFF"
+                text-color="#FFFFFF"
+                hover-color="#4DA6FF"
+                outline-color="#FFFFFF"
+                outline-width="0.6" />
+		</vertical>
+
+		<!-- RIGHT: cooldown configuration -->
+		<vertical vertical-fit="PreferredSize" spacing="2" pad="2" pref-width="60">
+
+			<text text="Cooldown Settings" align="Center" font-size="5" />
+
+			<!-- Global cooldown -->
+			<toggle-setting
+                text="Global cooldown enabled"
+                value="global_cd_enabled"
+                apply-on-change="true" />
+
+			<increment-setting
+                text="Global cooldown (seconds)"
+                value="global_cd_seconds"
+                increment="5"
+                min="0"
+                max="300"
+                integer-only="true"
+                apply-on-change="true" />
+
+			<text text="Rainbow command" align="Center" font-size="4" />
+
+			<toggle-setting
+                text="Per-command cooldown enabled"
+                value="rainbow_cd_enabled"
+                apply-on-change="true" />
+
+			<increment-setting
+                text="Rainbow cooldown (seconds)"
+                value="rainbow_cd_seconds"
+                increment="5"
+                min="0"
+                max="300"
+                integer-only="true"
+                apply-on-change="true" />
+		</vertical>
+
+	</horizontal>
 </bg>

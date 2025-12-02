@@ -100,6 +100,8 @@ namespace SaberSurgeon.Chat
             }
         }
 
+        
+
         private void InitializeWhenReady()
         {
             if (_isInitialized)
@@ -126,7 +128,9 @@ namespace SaberSurgeon.Chat
                     Plugin.Log.Info("ChatManager: Got Multiplexer service reference");
                 }
 
+
                 var methods = serviceType.GetMethods(BindingFlags.Public | BindingFlags.Static);
+                
 
                 // Find BroadcastMessage method on Service
                 var broadcastMethod = methods.FirstOrDefault(m => m.Name == "BroadcastMessage");
@@ -236,39 +240,84 @@ namespace SaberSurgeon.Chat
                     return;
                 }
 
-                Plugin.Log.Info("CHAT MESSAGE RECEIVED!");
-
+                // --- Basic sender name ---
                 var sender = GetPropertyValue(message, "Sender") ??
-                            GetPropertyValue(message, "User") ??
-                            GetPropertyValue(message, "Author");
+                             GetPropertyValue(message, "User") ??
+                             GetPropertyValue(message, "Author");
 
                 string senderName = "Unknown";
                 if (sender != null)
                 {
                     var senderNameObj = GetPropertyValue(sender, "DisplayName") ??
-                                       GetPropertyValue(sender, "UserName") ??
-                                       GetPropertyValue(sender, "Name");
+                                        GetPropertyValue(sender, "UserName") ??
+                                        GetPropertyValue(sender, "Name");
                     senderName = senderNameObj?.ToString() ?? "Unknown";
                 }
 
+                // --- Message text ---
                 var messageTextObj = GetPropertyValue(message, "Message") ??
-                                    GetPropertyValue(message, "Text") ??
-                                    GetPropertyValue(message, "Content");
+                                     GetPropertyValue(message, "Text") ??
+                                     GetPropertyValue(message, "Content");
                 string messageText = messageTextObj?.ToString() ?? "";
 
-                Plugin.Log.Info($"Sender: {senderName}");
-                Plugin.Log.Info($"Message: {messageText}");
-
-                if (messageText.StartsWith("!"))
+                // --- Helpers for typed properties ---
+                bool GetBool(object obj, params string[] names)
                 {
-                    CommandHandler.Instance.ProcessCommand(messageText, senderName, message);
+                    if (obj == null) return false;
+                    foreach (var n in names)
+                    {
+                        var v = GetPropertyValue(obj, n);
+                        if (v is bool b) return b;
+                    }
+                    return false;
                 }
+
+                int GetInt(object obj, params string[] names)
+                {
+                    if (obj == null) return 0;
+                    foreach (var n in names)
+                    {
+                        var v = GetPropertyValue(obj, n);
+                        if (v is int i) return i;
+                        if (v is long l) return (int)l;
+                    }
+                    return 0;
+                }
+
+                // --- Build ChatContext with roles + bits ---
+                var ctx = new ChatContext
+                {
+                    SenderName = senderName,
+                    MessageText = messageText,
+                    RawService = service,
+                    RawMessage = message,
+
+                    IsModerator = GetBool(sender, "IsModerator", "Moderator", "IsMod"),
+                    IsVip = GetBool(sender, "IsVip", "VIP"),
+                    IsSubscriber = GetBool(sender, "IsSubscriber", "Subscriber", "IsSub"),
+                    IsBroadcaster = GetBool(sender, "IsBroadcaster", "Broadcaster"),
+
+                    // Common ChatPlex/Twitch property names for bits
+                    Bits = GetInt(message, "Bits", "BitsAmount", "CheerAmount")
+                };
+
+                // Minimal log – good for debugging, not spammy
+                Plugin.Log.Info($"CHAT MESSAGE RECEIVED: {ctx.SenderName} (Mod={ctx.IsModerator}, VIP={ctx.IsVip}, Sub={ctx.IsSubscriber}, Bits={ctx.Bits})");
+
+                // Commands handled by SaberSurgeon
+                if (ctx.MessageText.StartsWith("!"))
+                {
+                    CommandHandler.Instance.ProcessCommand(ctx.MessageText, ctx);
+                }
+
+                // Non-command messages: no extra work here; follows/subs/channel points handled by Streamer.bot.
             }
             catch (Exception ex)
             {
                 Plugin.Log.Error($"ChatManager: Error handling message: {ex.Message}");
             }
         }
+
 
         private void HandleLoadingStateChanged(bool isLoading)
         {

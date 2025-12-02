@@ -32,12 +32,11 @@ namespace SaberSurgeon.UI.FlowCoordinators
             {
                 // Important: configure which tabs to show, just like Shaffuru does
                 _gameplaySetupViewController.Setup(
-                    true,  // enableModifiers
-                    true,  // enablePlayerSettings
-                    true,  // enableEnvironmentOverrides
-                    true, // enableColorSchemes (set true if you want color schemes)
-                    
-                    PlayerSettingsPanelController.PlayerSettingsPanelLayout.Singleplayer
+                    showModifiers: true,                  // Modifiers tab
+                    showEnvironmentOverrideSettings: true, // Environments tab
+                    showColorSchemesSettings: true,        // Colors tab
+                    showMultiplayer: false,                // NO Multiplayer tab
+                    playerSettingsPanelLayout: PlayerSettingsPanelController.PlayerSettingsPanelLayout.Singleplayer
                 );
 
                 ProvideInitialViewControllers(

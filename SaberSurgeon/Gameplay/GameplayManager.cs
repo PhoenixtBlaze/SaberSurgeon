@@ -24,7 +24,7 @@ namespace SaberSurgeon.Gameplay
 
         // Dependencies
         private MenuTransitionsHelper _menuTransitionsHelper;
-        [Inject] private BeatmapLevelsModel _beatmapLevelsModel;
+        //[Inject] private BeatmapLevelsModel _beatmapLevelsModel;
         private EnvironmentsListModel _environmentsListModel;
         private GameplayModifiers _capturedModifiers;
         private PlayerSpecificSettings _capturedPlayerSettings;
@@ -34,10 +34,17 @@ namespace SaberSurgeon.Gameplay
         private bool _isPlaying = false;
         private float _remainingTime = 0f;
         private float _totalTime = 0f;
+        private int _lastLoggedWholeMinutes = -1;
         private List<BeatmapLevel> _availableLevels = new List<BeatmapLevel>();
         private List<string> _playedLevelIds = new List<string>();
         private Queue<SongRequest> _requestQueue = new Queue<SongRequest>();
         private bool _isLoadingSong = false;
+
+        // Track why the last level ended
+        private LevelCompletionResults.LevelEndAction _lastLevelEndAction = LevelCompletionResults.LevelEndAction.None;
+
+
+
         // A reasonable “default with No Fail on” set of modifiers
         private static GameplayModifiers CreateDefaultNoFailModifiers()
         {
@@ -145,6 +152,54 @@ namespace SaberSurgeon.Gameplay
             _playedLevelIds.Clear();
             _requestQueue.Clear();
         }
+
+
+        
+        public bool TryPrepareNextChain(
+            out BeatmapLevel nextLevel,
+            out BeatmapKey nextKey,
+            out GameplayModifiers modifiers,
+            out PlayerSpecificSettings playerSettings,
+            out ColorScheme color,
+            out EnvironmentsListModel envs)
+        {
+            nextLevel = null;
+            nextKey = default;
+            modifiers = _capturedModifiers ?? CreateDefaultNoFailModifiers();
+            playerSettings = _capturedPlayerSettings ?? new PlayerSpecificSettings();
+            color = _capturedColorScheme;
+            envs = _environmentsListModel; // may be null; Init accepts it [matches signature]
+
+            // Prefer queued request, otherwise random non-repeating
+            BeatmapLevel level = null;
+            if (_requestQueue.Count > 0)
+            {
+                var req = _requestQueue.Dequeue();
+                level = FindLevelByBsr(req.BsrCode);
+            }
+            if (level == null)
+                level = GetRandomLevel();
+            if (level == null)
+                return false;
+
+            // Standard characteristic + random available difficulty
+            var standard = Resources.FindObjectsOfTypeAll<BeatmapCharacteristicSO>()
+                .FirstOrDefault(x => x.serializedName == "Standard");
+            if (standard == null)
+                return false;
+
+            var diffs = level.GetDifficulties(standard)?.ToArray();
+            if (diffs == null || diffs.Length == 0)
+                return false;
+
+            var diff = diffs[UnityEngine.Random.Range(0, diffs.Length)];
+
+            _playedLevelIds.Add(level.levelID);
+            nextLevel = level;
+            nextKey = new BeatmapKey(level.levelID, standard, diff);
+            return true;
+        }
+
 
         /// <summary>
         /// Queue a song request from chat (BSR code)
@@ -273,8 +328,8 @@ namespace SaberSurgeon.Gameplay
                 // Play the song
                 yield return StartCoroutine(PlayLevel(nextLevel, requestInfo));
 
-                // Wait a bit before next song
-                yield return new WaitForSeconds(2f);
+                // Seamless chaining is handled by the Harmony patch; stop this loop after first song.
+                yield break;
             }
 
             // Time's up!
@@ -287,15 +342,17 @@ namespace SaberSurgeon.Gameplay
         /// </summary>
         private IEnumerator TimerCountdown()
         {
+            _lastLoggedWholeMinutes = -1;
+
             while (_isPlaying && _remainingTime > 0)
             {
                 _remainingTime -= Time.deltaTime;
 
-                // Log every minute
-                if (Mathf.FloorToInt(_remainingTime) % 60 == 0)
+                int wholeMinutes = Mathf.Max(0, Mathf.FloorToInt(_remainingTime / 60f));
+                if (wholeMinutes != _lastLoggedWholeMinutes)
                 {
-                    int minutesLeft = Mathf.FloorToInt(_remainingTime / 60f);
-                    Plugin.Log.Info($"GameplayManager: {minutesLeft} minutes remaining");
+                    _lastLoggedWholeMinutes = wholeMinutes;
+                    Plugin.Log.Info($"GameplayManager: {wholeMinutes} minutes remaining");
                 }
 
                 yield return null;
@@ -308,7 +365,10 @@ namespace SaberSurgeon.Gameplay
         private IEnumerator PlayLevel(BeatmapLevel level, string announceMessage = null)
         {
             _isLoadingSong = true;
+            _lastLevelEndAction = LevelCompletionResults.LevelEndAction.None;
+
             Plugin.Log.Info($"GameplayManager: Playing level: {level.songName}");
+
             if (!string.IsNullOrEmpty(announceMessage))
                 Chat.ChatManager.GetInstance().SendChatMessage(announceMessage);
 
@@ -339,13 +399,14 @@ namespace SaberSurgeon.Gameplay
 
             try
             {
-                // *** CHANGED: Use captured settings instead of empty ones ***
                 var gameplayModifiers = _capturedModifiers ?? CreateDefaultNoFailModifiers();
                 var playerSettings = _capturedPlayerSettings ?? new PlayerSpecificSettings();
 
-                Plugin.Log.Info($"GameplayManager: Starting level with captured modifiers (No Fail: {gameplayModifiers.noFailOn0Energy})");
+                Plugin.Log.Info(
+                    $"GameplayManager: Starting level with captured modifiers (No Fail: {gameplayModifiers.noFailOn0Energy})");
 
                 OverrideEnvironmentSettings overrideEnvironmentSettings = null;
+
                 var beatmapKey = new BeatmapKey(
                     level.levelID,
                     standardCharacteristic,
@@ -353,40 +414,58 @@ namespace SaberSurgeon.Gameplay
                 );
 
                 _menuTransitionsHelper.StartStandardLevel(
-                    gameMode: "Solo",
-                    beatmapKey: beatmapKey,
-                    beatmapLevel: level,
-                    overrideEnvironmentSettings: overrideEnvironmentSettings,
-                    playerOverrideColorScheme: _capturedColorScheme, // Use captured color scheme
-                    playerOverrideLightshowColors: false,
-                    beatmapOverrideColorScheme: null,
-                    gameplayModifiers: gameplayModifiers, // *** Use captured modifiers ***
-                    playerSpecificSettings: playerSettings, // *** Use captured player settings ***
-                    practiceSettings: null,
-                    environmentsListModel: _environmentsListModel,
-                    backButtonText: "Menu",
-                    useTestNoteCutSoundEffects: false,
-                    startPaused: false,
-                    beforeSceneSwitchToGameplayCallback: null,
-                    afterSceneSwitchToGameplayCallback: null,
-                    levelFinishedCallback: (data, results) =>
+                    "Solo",
+                    in beatmapKey,
+                    level,
+                    overrideEnvironmentSettings,
+                    _capturedColorScheme,
+                    false,
+                    null,
+                    gameplayModifiers,
+                    playerSettings,
+                    null,
+                    _environmentsListModel,
+                    "Menu",
+                    false,
+                    false,
+                    null,
+                    null,
+                    (data, results) =>
                     {
-                        Plugin.Log.Info("GameplayManager: Level completed/failed");
+                        Plugin.Log.Info(
+                            $"GameplayManager: Level finished. State={results.levelEndStateType}, Action={results.levelEndAction}");
+
+                        _lastLevelEndAction = results.levelEndAction;
                         _isLoadingSong = false;
                     },
-                    levelRestartedCallback: null,
-                    recordingToolData: null
+                    null,
+                    null
                 );
             }
             catch (Exception ex)
             {
                 Plugin.Log.Error($"GameplayManager: Error starting level:\n{ex}");
                 _isLoadingSong = false;
+                yield break;
             }
 
-            // Approximate wait: use song duration
-            float songDuration = level.songDuration;
-            yield return new WaitForSeconds(songDuration);
+            // Wait until the level actually finishes or endless mode stops
+            while (_isLoadingSong && _isPlaying)
+                yield return null;
+
+            // If endless mode was stopped elsewhere (timer expired, manual stop), just exit
+            if (!_isPlaying)
+                yield break;
+
+            // If player chose "Quit to Menu", stop endless mode instead of forcing another song
+            if (_lastLevelEndAction == LevelCompletionResults.LevelEndAction.Quit)
+            {
+                Plugin.Log.Info("GameplayManager: Player quit to menu, stopping endless mode");
+                StopEndlessMode();
+                yield break;
+            }
+
+            // Otherwise (Cleared/Failed/Restart handled internally), just return to let GameplayLoop move on
         }
 
 
@@ -513,42 +592,43 @@ namespace SaberSurgeon.Gameplay
 
         private bool EnsureDependencies()
         {
+            // Resolve MenuTransitionsHelper once
             if (_menuTransitionsHelper == null)
             {
-                _menuTransitionsHelper = Resources.FindObjectsOfTypeAll<MenuTransitionsHelper>()
-                                                  .FirstOrDefault();
+                _menuTransitionsHelper = Resources
+                    .FindObjectsOfTypeAll<MenuTransitionsHelper>()
+                    .FirstOrDefault();
+
                 if (_menuTransitionsHelper == null)
                 {
                     Plugin.Log.Error("GameplayManager: Could not find MenuTransitionsHelper in scene");
                     return false;
                 }
+
                 Plugin.Log.Info("GameplayManager: Resolved MenuTransitionsHelper");
             }
 
+            // Resolve EnvironmentsListModel once
             if (_environmentsListModel == null)
             {
-               
-                if (_environmentsListModel == null)
-                {
-                    Plugin.Log.Error("GameplayManager: Could not find EnvironmentsListModel in scene");
-                    return false;
-                }
-
-                Plugin.Log.Info("GameplayManager: Resolved EnvironmentsListModel");
+                Plugin.Log.Warn(
+                    "GameplayManager: EnvironmentsListModel not resolved; " +
+                    "passing null to StartStandardLevel (game will use default environments)."
+                );
             }
 
             return true;
         }
 
-    }
 
-    /// <summary>
-    /// Represents a song request from chat
-    /// </summary>
-    public class SongRequest
-    {
-        public string BsrCode { get; set; }
-        public string RequesterName { get; set; }
-        public DateTime RequestTime { get; set; }
+        /// <summary>
+        /// Represents a song request from chat
+        /// </summary>
+        public class SongRequest
+        {
+            public string BsrCode { get; set; }
+            public string RequesterName { get; set; }
+            public DateTime RequestTime { get; set; }
+        }
     }
 }

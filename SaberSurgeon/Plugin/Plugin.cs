@@ -1,12 +1,15 @@
-﻿using System;
-using BeatSaberMarkupLanguage;
+﻿using BeatSaberMarkupLanguage;
 using BeatSaberMarkupLanguage.MenuButtons;
 using BeatSaberMarkupLanguage.Util;
+using HarmonyLib;
 using IPA;
 using IPA.Config.Stores;
 using IPA.Logging;
-using SaberSurgeon.UI.FlowCoordinators;
 using SaberSurgeon.Chat;
+using SaberSurgeon.UI.FlowCoordinators;
+using System;
+using System.Linq;
+using UnityEngine;
 
 namespace SaberSurgeon
 {
@@ -14,32 +17,57 @@ namespace SaberSurgeon
     public class Plugin
     {
         internal static Plugin Instance { get; private set; }
-        internal static Logger Log { get; private set; }
+        internal static IPA.Logging.Logger Log { get; private set; }
         internal static IPA.Config.Config Configuration { get; private set; }
 
         private MenuButton _menuButton;
         private SaberSurgeonFlowCoordinator _flowCoordinator;
 
         [Init]
-        public void Init(Logger logger, IPA.Config.Config config)
+        public void Init(IPA.Logging.Logger logger, IPA.Config.Config config)
         {
             Log = logger;
             Instance = this;
             Configuration = config;
             Log.Info("SaberSurgeon: Init");
+
         }
 
         [OnStart]
         public void OnApplicationStart()
         {
+
+
             Log.Info("SaberSurgeon: OnApplicationStart");
             MainMenuAwaiter.MainMenuInitializing += OnMainMenuInitializing;
+
+            // Find the AudioTimeSyncController once when gameplay scene loads
+            var audio = Resources.FindObjectsOfTypeAll<AudioTimeSyncController>()
+                                 .FirstOrDefault();
+            if (audio != null)
+            {
+                SaberSurgeon.Gameplay.GhostVisualController.Audio = audio;
+                Log.Info("GhostVisualController: bound AudioTimeSyncController ");
+            }
 
             // Initialize chat integration
             InitializeChatIntegration();
 
             // Initialize gameplay manager
             InitializeGameplayManager();
+
+            try
+            {
+                var h = new Harmony("SaberSurgeon.Endless");
+                h.PatchAll(typeof(SaberSurgeon.HarmonyPatches.EndlessHarmonyPatch).Assembly);
+                Log.Info("SaberSurgeon: EndlessHarmonyPatch applied");
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"SaberSurgeon: Harmony patch error: {ex}");
+            }
+
+
         }
 
         private void OnMainMenuInitializing()
@@ -60,7 +88,7 @@ namespace SaberSurgeon
             }
             catch (Exception ex)
             {
-                Log.Critical($"SaberSurgeon: Exception in OnMainMenuInitializing: {ex}");
+                Log.Critical($"SaberSurgeon: Exception in OnMainMenuInitializing : {ex}");
             }
             finally
             {
