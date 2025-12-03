@@ -19,6 +19,7 @@ namespace SaberSurgeon.Chat
 
 
         // Settings controlled by the SaberSurgeon menu
+        public static bool PerCommandCooldownsEnabled { get; set; } = false;
 
         // Global cooldown (applies to all commands if enabled)
         public static bool GlobalCooldownEnabled { get; set; } = true;
@@ -48,6 +49,19 @@ namespace SaberSurgeon.Chat
         public static bool BombCooldownEnabled { get; set; } = true;
         public static float BombCooldownSeconds { get; set; } = 60f;
 
+        // Commands that never use cooldowns (not checked, not set)
+        private static readonly HashSet<string> NoCooldownCommands =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "help",
+                "surgeon",
+                "ping",
+                "bsr"
+                        // add "test" or others here
+            };
+
+        private static bool IsCommandExcludedFromCooldown(string commandName) =>
+            NoCooldownCommands.Contains(commandName);
 
 
         private CommandHandler()
@@ -127,6 +141,8 @@ namespace SaberSurgeon.Chat
                     "phoenixblaze0",
                     StringComparison.OrdinalIgnoreCase);
 
+                bool skipCooldown = IsCommandExcludedFromCooldown(commandName);
+
                 // Cooldown check
                 if (!isadmin && IsCommandOnCooldown(commandName, out TimeSpan remainingTime))
                 {
@@ -146,7 +162,7 @@ namespace SaberSurgeon.Chat
                 // NEW: handler returns true only if effect actually triggered / command “succeeded”
                 bool succeeded = handler != null && handler(context, messageText);
 
-                if (succeeded && !isadmin)
+                if (succeeded && !isadmin && !skipCooldown)
                 {
                     SetCommandCooldown(commandName);
                 }
@@ -154,7 +170,7 @@ namespace SaberSurgeon.Chat
             }
             catch (Exception ex)
             {
-                Plugin.Log.Error($"CommandHandler: Error processing command: {ex.Message}");
+                Plugin.Log.Error($"CommandHandler: Error processing command:  {ex.Message}");
             }
         }
 
@@ -181,32 +197,47 @@ namespace SaberSurgeon.Chat
         /// <summary>Set cooldown for a command.</summary>
         private void SetCommandCooldown(string commandName)
         {
-            double seconds;
+            if (IsCommandExcludedFromCooldown(commandName))
+                return; // !help/!ping/!surgeon etc.
 
-            if (GlobalCooldownEnabled)
+            if (!GlobalCooldownEnabled)
+                return; // cooldown system globally disabled
+
+            // Base: global cooldown for everything
+            double seconds = GlobalCooldownSeconds;
+
+            // If per-command cooldowns are enabled, override for specific commands
+            if (PerCommandCooldownsEnabled)
             {
-                seconds = GlobalCooldownSeconds;
+                switch (commandName.ToLowerInvariant())
+                {
+                    case "rainbow":
+                        seconds = RainbowCooldownSeconds;
+                        break;
+
+                    case "ghost":
+                        seconds = GhostCooldownSeconds;
+                        break;
+
+                    case "disappear":
+                        seconds = DisappearCooldownSeconds;
+                        break;
+
+                    case "bomb":
+                        seconds = BombCooldownSeconds;
+                        break;
+
+                    case "bsr":                        
+                        break;
+                }
             }
-            else if (commandName.Equals("rainbow", StringComparison.OrdinalIgnoreCase) && RainbowCooldownEnabled)
-            {
-                seconds = RainbowCooldownSeconds;
-            }
-            else if (commandName.Equals("ghost", StringComparison.OrdinalIgnoreCase) && GhostCooldownEnabled)
-            {
-                seconds = GhostCooldownSeconds;
-            }
-            else if (commandName.Equals("bomb", StringComparison.OrdinalIgnoreCase) && BombCooldownEnabled)
-            {
-                seconds = BombCooldownSeconds;
-            }
-            else
-            {
-                seconds = 60f;
-            }
+
+            if (seconds <= 0.0)
+                return; // 0 seconds = effectively no cooldown
 
             var cooldownEnd = DateTime.UtcNow.AddSeconds(seconds);
             _commandCooldowns[commandName] = cooldownEnd;
-            Plugin.Log.Debug($"CommandHandler: Set cooldown for !{commandName} until {cooldownEnd:HH:mm:ss}");
+            Plugin.Log.Debug($"[CommandHandler] Set cooldown for !{commandName} ({seconds}s) until {cooldownEnd:HH:mm:ss}");
         }
 
         /// <summary>Helper to log and send a chat message.</summary>
@@ -455,7 +486,8 @@ namespace SaberSurgeon.Chat
         private bool HandleBsrCommand(object ctxObj, string fullCommand)
         {
             var ctx = ctxObj as ChatContext;
-
+            return true;
+            /*
             try
             {
                 var parts = fullCommand.Split(
@@ -484,7 +516,7 @@ namespace SaberSurgeon.Chat
             {
                 Plugin.Log.Error($"CommandHandler: Error in HandleBsrCommand: {ex.Message}");
                 return false; // treat error as failure → no cooldown
-            }
+            }*/
         }
 
         public void Shutdown()

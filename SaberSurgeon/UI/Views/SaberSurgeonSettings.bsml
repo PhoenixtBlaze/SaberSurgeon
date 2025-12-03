@@ -1,62 +1,62 @@
 ﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
     xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
 
+	<!-- Root: left = main controls, right = cooldowns -->
 	<horizontal spacing="5" pad="2">
 
 		<!-- LEFT: main SaberSurgeon controls -->
 		<vertical vertical-fit="PreferredSize" spacing="2" pad="2">
 
-			<!-- Command toggles row: Rainbow + DA side by side -->
+			<!-- Command toggles row: Rainbow + DA + Ghost + Bomb -->
 			<horizontal spacing="1" pad="0" horizontal-fit="PreferredSize">
 				<!-- Rainbow -->
 				<button id="rainbowbutton"
-						on-click="OnRainbowButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable Rainbow Command">
+                        on-click="OnRainbowButtonClicked"
+                        pref-width="15"
+                        pref-height="15"
+                        hover-hint="Enable/Disable Rainbow Command">
 					<image id="rainbowicon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
+                           preserve-aspect="true"
+                           pref-width="13"
+                           pref-height="13" />
 				</button>
 
 				<!-- Disappearing Arrows -->
 				<button id="dabutton"
-						on-click="OnDAButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable Disappearing Arrows Command">
+                        on-click="OnDAButtonClicked"
+                        pref-width="15"
+                        pref-height="15"
+                        hover-hint="Enable/Disable Disappearing Arrows Command">
 					<image id="daicon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
+                           preserve-aspect="true"
+                           pref-width="13"
+                           pref-height="13" />
 				</button>
-				
+
 				<!-- Ghost Notes -->
 				<button id="ghostbutton"
-						on-click="OnGhostButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable Ghost Notes Command">
+                        on-click="OnGhostButtonClicked"
+                        pref-width="15"
+                        pref-height="15"
+                        hover-hint="Enable/Disable Ghost Notes Command">
 					<image id="ghosticon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
+                           preserve-aspect="true"
+                           pref-width="13"
+                           pref-height="13" />
 				</button>
 
 				<!-- Bomb Command -->
 				<button id="bombbutton"
-						on-click="OnBombButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable Bomb Command">
+                        on-click="OnBombButtonClicked"
+                        pref-width="15"
+                        pref-height="15"
+                        hover-hint="Enable/Disable Bomb Command">
 					<image id="bombicon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
+                           preserve-aspect="true"
+                           pref-width="13"
+                           pref-height="13" />
 				</button>
 			</horizontal>
-			
 
 			<!-- Play Time Slider -->
 			<slider-setting
@@ -101,21 +101,72 @@
                 integer-only="true"
                 apply-on-change="true" />
 
-			<text text="Rainbow command" align="Center" font-size="4" />
-
+			<!-- Master toggle for using per-command values in logic -->
 			<toggle-setting
-                text="Per-command cooldown enabled"
-                value="rainbow_cd_enabled"
-                apply-on-change="true" />
+                text="Use per-command cooldowns"
+                value="per_command_cd_enabled"
+                apply-on-change="true"
+                hover-hint="If off, all commands use the global cooldown." />
 
-			<increment-setting
-                text="Rainbow cooldown (seconds)"
-                value="rainbow_cd_seconds"
-                increment="5"
-                min="0"
-                max="300"
-                integer-only="true"
-                apply-on-change="true" />
+			<!-- Per-command cooldown sliders (always visible, logic decides how they're used) -->
+			<text text="Per-command cooldowns (seconds)" align="Center" font-size="4" />
+
+			<!-- Rainbow -->
+			<horizontal spacing="2" pad="0">
+				<text text="!rainbow" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="rainbow_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+
+			<!-- Ghost -->
+			<horizontal spacing="2" pad="0">
+				<text text="!ghost" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="ghost_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+
+			<!-- Disappear -->
+			<horizontal spacing="2" pad="0">
+				<text text="!disappear" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="disappear_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+
+			<!-- Bomb -->
+			<horizontal spacing="2" pad="0">
+				<text text="!bomb" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="bomb_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+
+			<!-- Optional: BSR -->
+			<text text="!help, !ping, !surgeon never use cooldowns."
+                  align="Center"
+                  font-size="3" />
 		</vertical>
 
 	</horizontal>

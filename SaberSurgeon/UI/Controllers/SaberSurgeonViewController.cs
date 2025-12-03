@@ -238,16 +238,20 @@ namespace SaberSurgeon.UI.Controllers
             }
         }
 
-        [UIValue("rainbow_cd_enabled")]
-        public bool RainbowCooldownEnabled
+        [UIValue("per_command_cd_enabled")]
+        public bool PerCommandCooldownsEnabled
         {
-            get => CommandHandler.RainbowCooldownEnabled;
+            get => CommandHandler.PerCommandCooldownsEnabled;
             set
             {
-                CommandHandler.RainbowCooldownEnabled = value;
-                NotifyPropertyChanged(nameof(RainbowCooldownEnabled));
+                CommandHandler.PerCommandCooldownsEnabled = value;
+                NotifyPropertyChanged(nameof(PerCommandCooldownsEnabled));
             }
         }
+
+
+
+
 
         [UIValue("rainbow_cd_seconds")]
         public float RainbowCooldownSeconds
@@ -257,6 +261,28 @@ namespace SaberSurgeon.UI.Controllers
             {
                 CommandHandler.RainbowCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
                 NotifyPropertyChanged(nameof(RainbowCooldownSeconds));
+            }
+        }
+
+        [UIValue("ghost_cd_seconds")]
+        public float GhostCooldownSeconds
+        {
+            get => CommandHandler.GhostCooldownSeconds;
+            set
+            {
+                CommandHandler.GhostCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
+                NotifyPropertyChanged(nameof(GhostCooldownSeconds));
+            }
+        }
+
+        [UIValue("disappear_cd_seconds")]
+        public float DisappearCooldownSeconds
+        {
+            get => CommandHandler.DisappearCooldownSeconds;
+            set
+            {
+                CommandHandler.DisappearCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
+                NotifyPropertyChanged(nameof(DisappearCooldownSeconds));
             }
         }
 
@@ -270,6 +296,8 @@ namespace SaberSurgeon.UI.Controllers
                 NotifyPropertyChanged(nameof(BombCooldownSeconds));
             }
         }
+
+
 
         // === Lifecycle / visual updates ===
 
