@@ -1,0 +1,138 @@
+<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+    xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
+    <scroll-view>
+    <!-- RIGHT: cooldown configuration -->
+		<vertical vertical-fit="PreferredSize" spacing="2" pad="2" pref-width="110">
+
+			<text text="Cooldown Settings" align="Center" font-size="5" />
+
+			<!-- Global cooldown -->
+			<toggle-setting
+                text="Global cooldowns"
+                value="global_cd_enabled"
+                apply-on-change="true"
+				hover-hint="Keep On, Unless you want to remove all cooldowns"/>
+
+			<increment-setting
+                text="Global cooldown (seconds)"
+                value="global_cd_seconds"
+                increment="5"
+                min="0"
+                max="300"
+                integer-only="true"
+                apply-on-change="true" />
+
+			<!-- Master toggle for using per-command values in logic -->
+			
+			<toggle-setting
+                text="Use per-command cooldowns"
+                value="per_command_cd_enabled"
+                apply-on-change="true"
+                hover-hint="If off, all commands use the global cooldown. Keep Global Cooldowns enabled for it to work." />
+			<!-- Speed command exclusivity -->
+			
+			<toggle-setting
+					text="Only one speed command at a time"
+					value="speed_exclusive_enabled"
+					apply-on-change="true"
+					hover-hint="If on, !faster, !superfast, !slower cannot overlap." />
+			
+
+			<!-- Per-command cooldown sliders (always visible, logic decides how they're used) -->
+			<text text="Per-command cooldowns (seconds)" align="Center" font-size="4" />
+
+			<!-- Rainbow -->
+			<horizontal spacing="2" pad="0">
+				<text text="!rainbow" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="rainbow_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+
+			<!-- Ghost -->
+			<horizontal spacing="2" pad="0">
+				<text text="!ghost" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="ghost_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+
+			<!-- Disappear -->
+			<horizontal spacing="2" pad="0">
+				<text text="!disappear" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="disappear_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+
+			<!-- Bomb -->
+			<horizontal spacing="2" pad="0">
+				<text text="!bomb" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+                    text=""
+                    value="bomb_cd_seconds"
+                    min="0"
+                    max="300"
+                    increment="5"
+                    integer-only="true"
+                    apply-on-change="true" />
+			</horizontal>
+			<!-- Faster -->
+			<horizontal spacing="2" pad="0">
+				<text text="!faster" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+					text=""
+					value="faster_cd_seconds"
+					min="0"
+					max="300"
+					increment="5"
+					integer-only="true"
+					apply-on-change="true" />
+			</horizontal>
+			<!-- SuperFast -->
+			<horizontal spacing="2" pad="0">
+				<text text="!superfast" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+					text=""
+					value="superfast_cd_seconds"
+					min="0"
+					max="300"
+					increment="5"
+					integer-only="true"
+					apply-on-change="true" />
+			</horizontal>
+			<!-- Slower -->
+			<horizontal spacing="2" pad="0">
+				<text text="!slower" align="Left" font-size="4" pref-width="15" />
+				<increment-setting
+						text=""
+						value="slower_cd_seconds"
+						min="0"
+						max="300"
+						increment="5"
+						integer-only="true"
+						apply-on-change="true" />
+			</horizontal>
+			<!-- Optional: BSR -->
+			<text text="!bsr never use cooldowns."
+                  align="Center"
+                  font-size="3" />
+		</vertical>
+
+    </scroll-view>
+</bg>

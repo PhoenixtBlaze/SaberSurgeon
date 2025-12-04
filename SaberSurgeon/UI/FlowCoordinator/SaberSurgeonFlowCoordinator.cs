@@ -10,6 +10,7 @@ namespace SaberSurgeon.UI.FlowCoordinators
     public class SaberSurgeonFlowCoordinator : FlowCoordinator
     {
         private SaberSurgeonViewController _viewController;
+        private SaberSurgeonCooldownViewController _cooldownViewController;
 
         [Inject] private GameplaySetupViewController _gameplaySetupViewController;
         [Inject] private MenuTransitionsHelper _menuTransitionsHelper;
@@ -23,30 +24,29 @@ namespace SaberSurgeon.UI.FlowCoordinators
                 showBackButton = true;
 
                 _viewController = BeatSaberUI.CreateViewController<SaberSurgeonViewController>();
+                _cooldownViewController = BeatSaberUI.CreateViewController<SaberSurgeonCooldownViewController>();
 
-                // NEW: Inject dependencies into GameplayManager
                 GameplayManager.GetInstance().SetDependencies(_menuTransitionsHelper, _environmentsListModel);
             }
 
             if (addedToHierarchy)
             {
-                // Important: configure which tabs to show, just like Shaffuru does
                 _gameplaySetupViewController.Setup(
-                    showModifiers: true,                  // Modifiers tab
-                    showEnvironmentOverrideSettings: true, // Environments tab
-                    showColorSchemesSettings: true,        // Colors tab
-                    showMultiplayer: false,                // NO Multiplayer tab
+                    showModifiers: true,
+                    showEnvironmentOverrideSettings: true,
+                    showColorSchemesSettings: true,
+                    showMultiplayer: false,
                     playerSettingsPanelLayout: PlayerSettingsPanelController.PlayerSettingsPanelLayout.Singleplayer
                 );
 
+                // center = SaberSurgeon, left = gameplay setup, right = cooldowns
                 ProvideInitialViewControllers(
                     _viewController,
                     _gameplaySetupViewController,
-                    null
+                    _cooldownViewController
                 );
             }
         }
-
         protected override void BackButtonWasPressed(ViewController topViewController)
         {
             BeatSaberUI.MainFlowCoordinator.DismissFlowCoordinator(this);

@@ -49,6 +49,24 @@ namespace SaberSurgeon.Chat
         public static bool BombCooldownEnabled { get; set; } = true;
         public static float BombCooldownSeconds { get; set; } = 60f;
 
+        // Faster command toggle + cooldown
+        public static bool FasterEnabled { get; set; } = false;
+        public static float FasterCooldownSeconds { get; set; } = 60f;
+
+
+        // SuperFast command
+        public static bool SuperFastEnabled { get; set; } = false;
+        public static float SuperFastCooldownSeconds { get; set; } = 60f;
+
+        // Slower command
+        public static bool SlowerEnabled { get; set; } = true;
+        public static float SlowerCooldownSeconds { get; set; } = 60f;
+
+        // Speed command exclusivity
+        public static bool SpeedExclusiveEnabled { get; set; } = true;
+
+
+
         // Commands that never use cooldowns (not checked, not set)
         private static readonly HashSet<string> NoCooldownCommands =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -102,6 +120,9 @@ namespace SaberSurgeon.Chat
             RegisterCommand("ghost", HandleGhostCommand);
             RegisterCommand("disappear", HandleDisappearingArrowsCommand);
             RegisterCommand("bomb", HandleBombCommand);
+            RegisterCommand("faster", HandleFasterCommand);
+            RegisterCommand("superfast", HandleSuperFastCommand);
+            RegisterCommand("slower", HandleSlowerCommand);
         }
 
         private void RegisterCommand(string name, CommandDelegate handler)
@@ -174,6 +195,21 @@ namespace SaberSurgeon.Chat
             }
         }
 
+
+        private bool IsOtherSpeedEffectActive(string thisKey)
+        {
+            var mgr = Gameplay.FasterSongManager.Instance;
+            if (!SpeedExclusiveEnabled)
+                return false;
+
+            if (!mgr.IsActive)
+                return false;
+
+            // Another speed effect is active and it's not this one
+            return !string.Equals(mgr.ActiveEffectKey, thisKey, StringComparison.OrdinalIgnoreCase);
+        }
+
+
         /// <summary>Check if a command is currently on cooldown.</summary>
         private bool IsCommandOnCooldown(string commandName, out TimeSpan remainingTime)
         {
@@ -214,20 +250,23 @@ namespace SaberSurgeon.Chat
                     case "rainbow":
                         seconds = RainbowCooldownSeconds;
                         break;
-
                     case "ghost":
                         seconds = GhostCooldownSeconds;
                         break;
-
                     case "disappear":
                         seconds = DisappearCooldownSeconds;
                         break;
-
                     case "bomb":
                         seconds = BombCooldownSeconds;
                         break;
-
-                    case "bsr":                        
+                    case "faster":
+                        seconds = FasterCooldownSeconds;
+                        break;
+                    case "superfast":
+                        seconds = SuperFastCooldownSeconds;
+                        break;
+                    case "slower":
+                        seconds = SlowerCooldownSeconds;
                         break;
                 }
             }
@@ -260,6 +299,154 @@ namespace SaberSurgeon.Chat
             // This command always “does something”, so treat as success
             return true;
         }
+
+
+        private bool HandleFasterCommand(object ctxObj, string fullCommand)
+        {
+            if (!FasterEnabled)
+            {
+                SendResponse(
+                    "Faster command is disabled via menu",
+                    "!!Faster command is currently disabled in the Saber Surgeon settings.");
+                return false;
+            }
+
+            var ctx = ctxObj as ChatContext;
+
+            if (ctx != null && !(ctx.IsSubscriber || ctx.IsModerator || ctx.IsBroadcaster))
+            {
+                SendResponse(
+                    "Faster denied: not privileged",
+                    "!!You must be a sub or mod to use !faster.");
+                return false;
+            }
+
+            if (IsOtherSpeedEffectActive("faster"))
+            {
+                SendResponse(
+                    "Faster blocked: another speed effect is already active",
+                    "!!Another speed command is already active. Wait for it to end before using !faster.");
+                return false;
+            }
+
+            bool started = Gameplay.FasterSongManager.Instance.StartSpeedEffect(
+                "faster",
+                1.2f,          // +20%
+                30f,
+                "SaberSurgeon Faster");
+
+            if (!started)
+            {
+                SendResponse(
+                    "Faster ignored: not in a map",
+                    "!!Faster can only be used while you are playing a song.");
+                return false;
+            }
+
+            SendResponse(
+                $"Faster started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
+                "!!Faster song enabled for 30 seconds! Score submission disabled for this run.");
+            return true;
+        }
+
+
+        private bool HandleSuperFastCommand(object ctxObj, string fullCommand)
+        {
+            if (!SuperFastEnabled)
+            {
+                SendResponse(
+                    "SuperFast command is disabled via menu",
+                    "!!SuperFast command is currently disabled in the Saber Surgeon settings.");
+                return false;
+            }
+
+            var ctx = ctxObj as ChatContext;
+
+            if (ctx != null && !(ctx.IsSubscriber || ctx.IsModerator || ctx.IsBroadcaster))
+            {
+                SendResponse(
+                    "SuperFast denied: not privileged",
+                    "!!You must be a sub or mod to use !superfast.");
+                return false;
+            }
+
+            if (IsOtherSpeedEffectActive("superfast"))
+            {
+                SendResponse(
+                    "SuperFast blocked: another speed effect is already active",
+                    "!!Another speed command is already active. Wait for it to end before using !superfast.");
+                return false;
+            }
+
+            bool started = Gameplay.FasterSongManager.Instance.StartSpeedEffect(
+                "superfast",
+                1.5f,          // +50%
+                30f,
+                "SaberSurgeon SuperFast");
+
+            if (!started)
+            {
+                SendResponse(
+                    "SuperFast ignored: not in a map",
+                    "!!SuperFast can only be used while you are playing a song.");
+                return false;
+            }
+
+            SendResponse(
+                $"SuperFast started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
+                "!!Super Fast song enabled for 30 seconds! Score submission disabled for this run.");
+            return true;
+        }
+
+
+        private bool HandleSlowerCommand(object ctxObj, string fullCommand)
+        {
+            if (!SlowerEnabled)
+            {
+                SendResponse(
+                    "Slower command is disabled via menu",
+                    "!!Slower command is currently disabled in the Saber Surgeon settings.");
+                return false;
+            }
+
+            var ctx = ctxObj as ChatContext;
+
+            if (ctx != null && !(ctx.IsSubscriber || ctx.IsModerator || ctx.IsBroadcaster))
+            {
+                SendResponse(
+                    "Slower denied: not privileged",
+                    "!!You must be a sub or mod to use !slower.");
+                return false;
+            }
+
+            if (IsOtherSpeedEffectActive("slower"))
+            {
+                SendResponse(
+                    "Slower blocked: another speed effect is already active",
+                    "!!Another speed command is already active. Wait for it to end before using !slower.");
+                return false;
+            }
+
+            bool started = Gameplay.FasterSongManager.Instance.StartSpeedEffect(
+                "slower",
+                0.85f,         // -15%
+                30f,
+                "SaberSurgeon Slower");
+
+            if (!started)
+            {
+                SendResponse(
+                    "Slower ignored: not in a map",
+                    "!!Slower can only be used while you are playing a song.");
+                return false;
+            }
+
+            SendResponse(
+                $"Slower started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
+                "!!Slower song enabled for 30 seconds! Score submission disabled for this run.");
+            return true;
+        }
+
 
 
         private bool HandleBombCommand(object ctxObj, string fullCommand)

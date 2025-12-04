@@ -89,6 +89,24 @@ namespace SaberSurgeon.UI.Controllers
         private static readonly Sprite BombOnSprite =
             LoadEmbeddedSprite("SaberSurgeon.Assets.BombGB.png");
 
+        // Faster icons (off = FasterSong, on = FasterSongGB)
+        private static readonly Sprite FasterOffSprite =
+            LoadEmbeddedSprite("SaberSurgeon.Assets.FasterSong.png");
+        private static readonly Sprite FasterOnSprite =
+            LoadEmbeddedSprite("SaberSurgeon.Assets.FasterSongGB.png");
+
+        // SuperFast icons
+        private static readonly Sprite SuperFastOffSprite =
+            LoadEmbeddedSprite("SaberSurgeon.Assets.SuperFastSong.png");
+        private static readonly Sprite SuperFastOnSprite =
+            LoadEmbeddedSprite("SaberSurgeon.Assets.SuperFastSongGB.png");
+
+        // Slower icons
+        private static readonly Sprite SlowerOffSprite =
+            LoadEmbeddedSprite("SaberSurgeon.Assets.SlowerSong.png");
+        private static readonly Sprite SlowerOnSprite =
+            LoadEmbeddedSprite("SaberSurgeon.Assets.SlowerSongGB.png");
+
 
 
         // === Play time slider ===
@@ -181,24 +199,77 @@ namespace SaberSurgeon.UI.Controllers
             }
         }
 
-        [UIValue("bomb_cd_enabled")]
-        public bool BombCooldownEnabled
-        {
-            get => CommandHandler.BombCooldownEnabled;
-            set
-            {
-                CommandHandler.BombCooldownEnabled = value;
-                NotifyPropertyChanged(nameof(BombCooldownEnabled));
-            }
-        }
-
-
         [UIComponent("bombbutton")]
         private Button bombButton;
 
         [UIComponent("bombicon")]
         private Image bombIcon;
         private Image bombButtonImage;
+
+
+        [UIValue("faster_enabled")]
+        public bool FasterEnabled
+        {
+            get => CommandHandler.FasterEnabled;
+            set
+            {
+                CommandHandler.FasterEnabled = value;
+                NotifyPropertyChanged(nameof(FasterEnabled));
+                UpdateFasterButtonVisual();
+            }
+        }
+
+        [UIComponent("fasterbutton")]
+        private Button fasterButton;
+
+        [UIComponent("fastericon")]
+        private Image fasterIcon;
+
+        private Image fasterButtonImage;
+
+
+
+        [UIValue("superfast_enabled")]
+        public bool SuperFastEnabled
+        {
+            get => CommandHandler.SuperFastEnabled;
+            set
+            {
+                CommandHandler.SuperFastEnabled = value;
+                NotifyPropertyChanged(nameof(SuperFastEnabled));
+                UpdateSuperFastButtonVisual();
+            }
+        }
+
+        [UIComponent("superfastbutton")]
+        private Button superFastButton;
+
+        [UIComponent("superfasticon")]
+        private Image superFastIcon;
+
+        private Image superFastButtonImage;
+
+
+        [UIValue("slower_enabled")]
+        public bool SlowerEnabled
+        {
+            get => CommandHandler.SlowerEnabled;
+            set
+            {
+                CommandHandler.SlowerEnabled = value;
+                NotifyPropertyChanged(nameof(SlowerEnabled));
+                UpdateSlowerButtonVisual();
+            }
+        }
+
+        [UIComponent("slowerbutton")]
+        private Button slowerButton;
+
+        [UIComponent("slowericon")]
+        private Image slowerIcon;
+
+        private Image slowerButtonImage;
+
 
 
         // === UI components from BSML ===
@@ -213,90 +284,6 @@ namespace SaberSurgeon.UI.Controllers
         // Colors for OFF/ON states to mimic modifier highlight
         private readonly Color offColor = new Color(0.2f, 0.2f, 0.2f, 1f);
         private readonly Color onColor = new Color(0.18f, 0.7f, 1f, 1f);
-
-        // === Cooldown bindings ===
-
-        [UIValue("global_cd_enabled")]
-        public bool GlobalCooldownEnabled
-        {
-            get => CommandHandler.GlobalCooldownEnabled;
-            set
-            {
-                CommandHandler.GlobalCooldownEnabled = value;
-                NotifyPropertyChanged(nameof(GlobalCooldownEnabled));
-            }
-        }
-
-        [UIValue("global_cd_seconds")]
-        public float GlobalCooldownSeconds
-        {
-            get => CommandHandler.GlobalCooldownSeconds;
-            set
-            {
-                CommandHandler.GlobalCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
-                NotifyPropertyChanged(nameof(GlobalCooldownSeconds));
-            }
-        }
-
-        [UIValue("per_command_cd_enabled")]
-        public bool PerCommandCooldownsEnabled
-        {
-            get => CommandHandler.PerCommandCooldownsEnabled;
-            set
-            {
-                CommandHandler.PerCommandCooldownsEnabled = value;
-                NotifyPropertyChanged(nameof(PerCommandCooldownsEnabled));
-            }
-        }
-
-
-
-
-
-        [UIValue("rainbow_cd_seconds")]
-        public float RainbowCooldownSeconds
-        {
-            get => CommandHandler.RainbowCooldownSeconds;
-            set
-            {
-                CommandHandler.RainbowCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
-                NotifyPropertyChanged(nameof(RainbowCooldownSeconds));
-            }
-        }
-
-        [UIValue("ghost_cd_seconds")]
-        public float GhostCooldownSeconds
-        {
-            get => CommandHandler.GhostCooldownSeconds;
-            set
-            {
-                CommandHandler.GhostCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
-                NotifyPropertyChanged(nameof(GhostCooldownSeconds));
-            }
-        }
-
-        [UIValue("disappear_cd_seconds")]
-        public float DisappearCooldownSeconds
-        {
-            get => CommandHandler.DisappearCooldownSeconds;
-            set
-            {
-                CommandHandler.DisappearCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
-                NotifyPropertyChanged(nameof(DisappearCooldownSeconds));
-            }
-        }
-
-        [UIValue("bomb_cd_seconds")]
-        public float BombCooldownSeconds
-        {
-            get => CommandHandler.BombCooldownSeconds;
-            set
-            {
-                CommandHandler.BombCooldownSeconds = Mathf.Clamp(value, 0f, 300f);
-                NotifyPropertyChanged(nameof(BombCooldownSeconds));
-            }
-        }
-
 
 
         // === Lifecycle / visual updates ===
@@ -372,8 +359,49 @@ namespace SaberSurgeon.UI.Controllers
                     rt.anchoredPosition = Vector2.zero;
                     rt.sizeDelta = new Vector2(12f, 12f);
                 }
+                if (fasterButton != null)
+                {
+                    BeatSaberUI.SetButtonText(fasterButton, string.Empty);
+                    fasterButtonImage = fasterButton.GetComponent<Image>();
+                }
 
-                
+                if (fasterIcon != null)
+                {
+                    var rt = fasterIcon.rectTransform;
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.sizeDelta = new Vector2(12f, 12f);
+                }
+                if (superFastButton != null)
+                {
+                    BeatSaberUI.SetButtonText(superFastButton, string.Empty);
+                    superFastButtonImage = superFastButton.GetComponent<Image>();
+                }
+
+                if (superFastIcon != null)
+                {
+                    var rt = superFastIcon.rectTransform;
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.sizeDelta = new Vector2(12f, 12f);
+                }
+                if (slowerButton != null)
+                {
+                    BeatSaberUI.SetButtonText(slowerButton, string.Empty);
+                    slowerButtonImage = slowerButton.GetComponent<Image>();
+                }
+
+                if (slowerIcon != null)
+                {
+                    var rt = slowerIcon.rectTransform;
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.sizeDelta = new Vector2(12f, 12f);
+                }
+
             }
 
             // Apply correct sprite & color for current state
@@ -381,8 +409,74 @@ namespace SaberSurgeon.UI.Controllers
             UpdateGhostButtonVisual();
             UpdateBombButtonVisual();
             UpdateDAButtonVisual();
+            UpdateFasterButtonVisual();
+            UpdateSuperFastButtonVisual();
+            UpdateSlowerButtonVisual();
         }
 
+
+
+        private void UpdateSlowerButtonVisual()
+        {
+            if (slowerIcon != null)
+            {
+                var sprite = SlowerEnabled ? SlowerOnSprite : SlowerOffSprite;
+                if (sprite != null)
+                    slowerIcon.sprite = sprite;
+            }
+
+            if (slowerButtonImage != null)
+                slowerButtonImage.color = SlowerEnabled ? onColor : offColor;
+        }
+
+        [UIAction("OnSlowerButtonClicked")]
+        private void OnSlowerButtonClicked()
+        {
+            SlowerEnabled = !SlowerEnabled;
+            Plugin.Log.Info($"SaberSurgeon: Slower command enabled = {SlowerEnabled}");
+        }
+
+
+        private void UpdateSuperFastButtonVisual()
+        {
+            if (superFastIcon != null)
+            {
+                var sprite = SuperFastEnabled ? SuperFastOnSprite : SuperFastOffSprite;
+                if (sprite != null)
+                    superFastIcon.sprite = sprite;
+            }
+
+            if (superFastButtonImage != null)
+                superFastButtonImage.color = SuperFastEnabled ? onColor : offColor;
+        }
+
+        [UIAction("OnSFastButtonClicked")]
+        private void OnSFastButtonClicked()
+        {
+            SuperFastEnabled = !SuperFastEnabled;
+            Plugin.Log.Info($"SaberSurgeon: SuperFast command enabled = {SuperFastEnabled}");
+        }
+
+
+        private void UpdateFasterButtonVisual()
+        {
+            if (fasterIcon != null)
+            {
+                var sprite = FasterEnabled ? FasterOnSprite : FasterOffSprite;
+                if (sprite != null)
+                    fasterIcon.sprite = sprite;
+            }
+
+            if (fasterButtonImage != null)
+                fasterButtonImage.color = FasterEnabled ? onColor : offColor;
+        }
+
+        [UIAction("OnFasterButtonClicked")]
+        private void OnFasterButtonClicked()
+        {
+            FasterEnabled = !FasterEnabled;
+            Plugin.Log.Info($"SaberSurgeon: Faster command enabled = {FasterEnabled}");
+        }
 
 
         private void UpdateBombButtonVisual()
@@ -466,6 +560,8 @@ namespace SaberSurgeon.UI.Controllers
             GhostEnabled = !GhostEnabled;
             Plugin.Log.Info($"SaberSurgeon: Ghost command enabled = {GhostEnabled}");
         }
+
+
 
 
 
