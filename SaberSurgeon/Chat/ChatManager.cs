@@ -4,9 +4,17 @@ using System.Linq;
 using System.Reflection;
 using IPA.Loader;
 using UnityEngine;
+using SaberSurgeon.Twitch;
 
 namespace SaberSurgeon.Chat
 {
+    public enum ChatBackend
+    {
+        None,
+        NativeTwitch,
+        ChatPlex
+    }
+
     public class ChatManager : MonoBehaviour
     {
         private static ChatManager _instance;
@@ -19,6 +27,11 @@ namespace SaberSurgeon.Chat
 
         private object _chatService;
         private MethodInfo _broadcastMessageMethod;
+
+        private ChatBackend _activeBackend = ChatBackend.None;
+        private TwitchEventClient _twitchClient; // new class, see below
+
+        public ChatBackend ActiveBackend => _activeBackend;
 
         public static ChatManager GetInstance()
         {
@@ -40,8 +53,49 @@ namespace SaberSurgeon.Chat
                 return;
             }
 
-            Plugin.Log.Info("ChatManager: Starting initialization sequence...");
-            StartCoroutine(WaitForChatPlexAndInitialize());
+            var cfg = Plugin.Settings ?? new PluginConfig();
+            StartCoroutine(InitializeBackendsCoroutine(cfg));
+        }
+
+        private IEnumerator InitializeBackendsCoroutine(PluginConfig cfg)
+        {
+            // 1) Try Native Twitch backend first
+            if (!string.IsNullOrEmpty(cfg.EventServerUrl) && !string.IsNullOrEmpty(Plugin.Settings.CachedBroadcasterId))
+            {
+                _twitchClient = new TwitchEventClient(cfg.EventServerUrl, Plugin.Settings.CachedBroadcasterId);
+                yield return _twitchClient.ConnectCoroutine();
+
+                if (_twitchClient.IsConnected)
+                {
+                    HookNativeEvents(_twitchClient);
+                    _activeBackend = ChatBackend.NativeTwitch;
+                    _isInitialized = true;
+                    cfg.BackendStatus = "NativeTwitch";
+                    Plugin.Log.Info("ChatManager: Using Native Twitch backend");
+                    yield break;
+                }
+
+                Plugin.Log.Warn("ChatManager: Native Twitch backend not connected, trying ChatPlex fallback if allowed.");
+            }
+
+            // 2) Fallback to ChatPlex
+            if (Plugin.Settings.AllowChatPlexFallback)
+            {
+                Plugin.Log.Info("ChatManager: Falling back to ChatPlex backend...");
+                
+                // yield return StartCoroutine(WaitForChatPlexAndInitialize());
+                yield return WaitForChatPlexAndInitialize();
+
+                if (_isInitialized)
+                {
+                    _activeBackend = ChatBackend.ChatPlex;
+                    Plugin.Settings.BackendStatus = "ChatPlex";
+                    Plugin.Log.Info("ChatManager: ChatPlex backend initialized");
+                    yield break;
+                }
+            }
+
+            Plugin.Log.Error("ChatManager: No chat backend available.");
         }
 
         private IEnumerator WaitForChatPlexAndInitialize()
@@ -201,6 +255,46 @@ namespace SaberSurgeon.Chat
             }
         }
 
+        private void HookNativeEvents(TwitchEventClient client)
+        {
+            client.OnChatMessage += ctx =>
+            {
+                Plugin.Log.Info($"NATIVE CHAT: {ctx.SenderName}: {ctx.MessageText}");
+                DispatchChatMessage(ctx);
+            };
+
+            client.OnFollow += user =>
+            {
+                Plugin.Log.Info($"Follow: {user}");
+                // hook into whatever gameplay / overlay logic you want
+            };
+
+            client.OnSubscription += (user, tier) =>
+            {
+                Plugin.Log.Info($"Sub: {user} Tier={tier}");
+                // e.g. bump SupporterState and enable extra commands
+            };
+
+            client.OnRaid += (raider, viewers) =>
+            {
+                Plugin.Log.Info($"Raid: {raider} ({viewers} viewers)");
+                // e.g. fire a big bomb storm or flashbang effect
+            };
+        }
+
+
+        private void DispatchChatMessage(ChatContext ctx)
+        {
+            if (ctx == null || string.IsNullOrEmpty(ctx.MessageText))
+                return;
+
+            // Central entry point for all chat backends
+            if (ctx.MessageText.StartsWith("!") && !ctx.MessageText.StartsWith("!!"))
+                CommandHandler.Instance.ProcessCommand(ctx.MessageText, ctx);
+        }
+
+
+
         /// <summary>
         /// Send a message to Twitch chat using ChatPlexSDK
         /// </summary>
@@ -214,15 +308,25 @@ namespace SaberSurgeon.Chat
                     return;
                 }
 
+                // Prefer native Twitch if it's the active backend
+                if (_activeBackend == ChatBackend.NativeTwitch
+                    && _twitchClient != null
+                    && _twitchClient.IsConnected)
+                {
+                    _twitchClient.SendChatMessage(message);
+                    Plugin.Log.Info($"ChatManager: Sent to native Twitch backend: {message}");
+                    return;
+                }
+
+                // Fallback → ChatPlex BroadcastMessage
                 if (_broadcastMessageMethod == null)
                 {
                     Plugin.Log.Warn("ChatManager: Cannot send message - BroadcastMessage method not available");
                     return;
                 }
 
-                // Call CP_SDK.Chat.Service.BroadcastMessage(string message)
                 _broadcastMessageMethod.Invoke(null, new object[] { message });
-                Plugin.Log.Info($"ChatManager: Sent to chat: {message}");
+                Plugin.Log.Info($"ChatManager: Sent to ChatPlex: {message}");
             }
             catch (Exception ex)
             {
@@ -297,18 +401,15 @@ namespace SaberSurgeon.Chat
                     IsSubscriber = GetBool(sender, "IsSubscriber", "Subscriber", "IsSub"),
                     IsBroadcaster = GetBool(sender, "IsBroadcaster", "Broadcaster"),
 
-                    // Common ChatPlex/Twitch property names for bits
-                    Bits = GetInt(message, "Bits", "BitsAmount", "CheerAmount")
+                    Bits = GetInt(message, "Bits", "BitsAmount", "CheerAmount"),
+                    Source = ChatSource.ChatPlex
                 };
 
                 // Minimal log – good for debugging, not spammy
                 Plugin.Log.Info($"CHAT MESSAGE RECEIVED: {ctx.SenderName} (Mod={ctx.IsModerator}, VIP={ctx.IsVip}, Sub={ctx.IsSubscriber}, Bits={ctx.Bits})");
 
-                // Commands handled by SaberSurgeon
-                if (ctx.MessageText.StartsWith("!") && !ctx.MessageText.StartsWith("!!"))
-                {
-                    CommandHandler.Instance.ProcessCommand(ctx.MessageText, ctx);
-                }
+                // Pass through unified dispatcher used by both backends
+                DispatchChatMessage(ctx);
 
                 // Non-command messages: no extra work here; follows/subs/channel points handled by Streamer.bot.
             }

@@ -1,133 +1,184 @@
 ﻿<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
     xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
 
-	<!-- Root: left = main controls, right = cooldowns -->
-	<horizontal spacing="5" pad="2">
+	<vertical child-control-height="false"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="- https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd">
 
-		<!-- LEFT: main SaberSurgeon controls -->
-		<vertical vertical-fit="PreferredSize" spacing="2" pad="2">
+		<!-- Tab selector host -->
+		<tab-selector tab-tag="saber-surgeon-tabs" />
 
-			<!-- Command toggles row: Rainbow + DA + Ghost + Bomb -->
-			<horizontal spacing="1" pad="0" horizontal-fit="PreferredSize">
-				<!-- Rainbow -->
-				<button id="rainbowbutton"
-                        on-click="OnRainbowButtonClicked"
-                        pref-width="15"
-                        pref-height="15"
-                        hover-hint="Enable/Disable !Rainbow Command and !NoteColour Command">
-					<image id="rainbowicon"
-                           preserve-aspect="true"
-                           pref-width="13"
-                           pref-height="13" />
-				</button>
+		<!-- Tab strip area -->
+		<horizontal preferred-width="100" preferred-height="58" pad-top="4" pad="3">
 
-				<!-- Disappearing Arrows -->
-				<button id="dabutton"
-                        on-click="OnDAButtonClicked"
-                        pref-width="15"
-                        pref-height="15"
-                        hover-hint="Enable/Disable Disappearing Arrows Command">
-					<image id="daicon"
-                           preserve-aspect="true"
-                           pref-width="13"
-                           pref-height="13" />
-				</button>
+			<!-- TAB 1: Surgeon Commands -->
+			<tab tab-name="Surgeon Commands" tags="saber-surgeon-tabs">
+				<modifier-container child-expand-width="true" horizontal-fit="PreferredSize">
+					<!-- Root: left = main controls, right = cooldowns -->
+					<horizontal spacing="5" pad="2">
+						<!-- LEFT: main SaberSurgeon controls -->
+						<vertical vertical-fit="PreferredSize" spacing="2" pad="2">
 
-				<!-- Ghost Notes -->
-				<button id="ghostbutton"
-                        on-click="OnGhostButtonClicked"
-                        pref-width="15"
-                        pref-height="15"
-                        hover-hint="Enable/Disable Ghost Notes Command">
-					<image id="ghosticon"
-                           preserve-aspect="true"
-                           pref-width="13"
-                           pref-height="13" />
-				</button>
+							<!-- Command toggles row: Rainbow + DA + Ghost + Bomb + Faster -->
+							<horizontal spacing="1" pad="0" horizontal-fit="PreferredSize">
+								<!-- Rainbow -->
+								<button id="rainbowbutton"
+										on-click="OnRainbowButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable !Rainbow Command and !NoteColour Command">
+									<image id="rainbowicon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
 
-				<!-- Bomb Command -->
-				<button id="bombbutton"
-                        on-click="OnBombButtonClicked"
-                        pref-width="15"
-                        pref-height="15"
-                        hover-hint="Enable/Disable Bomb Command">
-					<image id="bombicon"
-                           preserve-aspect="true"
-                           pref-width="13"
-                           pref-height="13" />
-				</button>
-				<!-- Faster Song -->
-				<button id="fasterbutton"
-						on-click="OnFasterButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable Faster Command">
-					<image id="fastericon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
-				</button>
-			</horizontal>
-			<!-- Command toggles row: Faster Song + more -->
-			<horizontal spacing="1" pad="0" horizontal-fit="PreferredSize">
-				<!-- SuperFast Song-->
-				<button id="superfastbutton"
-						on-click="OnSFastButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable SuperFaster Command">
-					<image id="superfasticon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
-				</button>
-				<!-- Slower Song-->
-				<button id="slowerbutton"
-						on-click="OnSlowerButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable Slower Command">
-					<image id="slowericon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
-				</button>
-				<button id="flashbangbutton"
-						on-click="OnFlashbangButtonClicked"
-						pref-width="15"
-						pref-height="15"
-						hover-hint="Enable/Disable Flashbang Command (!flashbang)">
-					<image id="flashbangicon"
-						   preserve-aspect="true"
-						   pref-width="13"
-						   pref-height="13" />
-				</button>
-				
-			</horizontal>
+								<!-- Disappearing Arrows -->
+								<button id="dabutton"
+										on-click="OnDAButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable Disappearing Arrows Command">
+									<image id="daicon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
 
-			<!-- Play Time Slider -->
-			<!--slider-setting
-                text="Play Time (minutes)"
-                value="playTime"
-                min="5"
-                max="120"
-                increment="1"
-                apply-on-change="true" /-->
+								<!-- Ghost Notes -->
+								<button id="ghostbutton"
+										on-click="OnGhostButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable Ghost Notes Command">
+									<image id="ghosticon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
 
-			<!-- Start / Play Button -->
-			<!--button
-                text="Start / Play"
-                on-click="OnStartPlayPressed"
-                font-size="8"
-                pref-width="60"
-                pref-height="12"
-                bg-color="#2D8FFF"
-                text-color="#FFFFFF"
-                hover-color="#4DA6FF"
-                outline-color="#FFFFFF"
-                outline-width="0.6" /-->
-		</vertical>
+								<!-- Bomb Command -->
+								<button id="bombbutton"
+										on-click="OnBombButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable Bomb Command">
+									<image id="bombicon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
 
-		
-	</horizontal>
+								<!-- Faster Song -->
+								<button id="fasterbutton"
+										on-click="OnFasterButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable Faster Command">
+									<image id="fastericon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
+							</horizontal>
+
+							<!-- Command toggles row: SuperFast + Slower + Flashbang -->
+							<horizontal spacing="1" pad="0" horizontal-fit="PreferredSize">
+								<!-- SuperFast Song -->
+								<button id="superfastbutton"
+										on-click="OnSFastButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable SuperFaster Command">
+									<image id="superfasticon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
+
+								<!-- Slower Song -->
+								<button id="slowerbutton"
+										on-click="OnSlowerButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable Slower Command">
+									<image id="slowericon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
+
+								<!-- Flashbang -->
+								<button id="flashbangbutton"
+										on-click="OnFlashbangButtonClicked"
+										pref-width="15"
+										pref-height="15"
+										hover-hint="Enable/Disable Flashbang Command (!flashbang)">
+									<image id="flashbangicon"
+										   preserve-aspect="true"
+										   pref-width="13"
+										   pref-height="13" />
+								</button>
+							</horizontal>
+
+							
+						</vertical>
+					</horizontal>
+				</modifier-container>
+			</tab>
+
+			<!-- TAB 2: Other -->
+			<tab tab-name="Twitch + Endless" tags="saber-surgeon-tabs">
+
+				<modifier-container child-expand-width="true" horizontal-fit="PreferredSize">
+
+					<!-- Twitch Status Display (Read Only) -->
+					<horizontal horizontal-fit="PreferredSize" spacing="2">
+						<text text="Twitch:" font-size="5" color="#AAAAAA" align="MidlineLeft"/>
+						<text text="~TwitchStatusText"
+						  font-size="5"
+						  align="MidlineLeft"
+						  rich-text="true" />
+					</horizontal>
+
+					<horizontal>
+						<!-- Twitch Connect Button -->
+						<button text="Connect Twitch"
+						    on-click="OnConnectTwitchClicked"
+						    pref-width="30"
+						    pref-height="8"
+                            hover-hint="Opens browser to link your Twitch account"/>
+					</horizontal>
+					<horizontal spacing="5" pad="2">
+						<!-- Play Time Slider -->
+						<slider-setting
+								text="Play Time (minutes)"
+								value="playTime"
+								min="5"
+								max="120"
+								increment="1"
+								apply-on-change="true" />
+					</horizontal>
+					<horizontal>
+						<!-- Start / Play Button -->
+						<button
+								text="Start / Play"
+								on-click="OnStartPlayPressed"
+								font-size="8"
+								pref-width="60"
+								pref-height="12"
+								bg-color="#2D8FFF"
+								text-color="#FFFFFF"
+								hover-color="#4DA6FF"
+								outline-color="#FFFFFF"
+								outline-width="0.6" />
+					</horizontal>
+					
+				</modifier-container>
+			</tab>
+
+		</horizontal>
+
+	</vertical>
+
 </bg>

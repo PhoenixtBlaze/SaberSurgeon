@@ -50,27 +50,29 @@ namespace SaberSurgeon
         [OnStart]
         public void OnApplicationStart()
         {
-
-
             Log.Info("SaberSurgeon: OnApplicationStart");
-            BSEvents.menuSceneActive += OnMenuSceneActive;
-            
 
-            // Find the AudioTimeSyncController once when gameplay scene loads
+            BSEvents.menuSceneActive += OnMenuSceneActive;
+
+            // Bind AudioTimeSyncController (unchanged)
             var audio = Resources.FindObjectsOfTypeAll<AudioTimeSyncController>()
-                                 .FirstOrDefault();
+                .FirstOrDefault();
             if (audio != null)
             {
                 SaberSurgeon.Gameplay.GhostVisualController.Audio = audio;
                 Log.Info("GhostVisualController: bound AudioTimeSyncController ");
             }
 
-            // Initialize chat integration
+            // 1) Auth first – loads tokens and may kick off Helix fetch
+            SaberSurgeon.Twitch.TwitchAuthManager.Instance.Initialize();
+
+            // 2) Then chat manager (so it can see CachedBroadcasterId if available)
             InitializeChatIntegration();
 
-            // Initialize gameplay manager
+            // 3) Gameplay manager
             InitializeGameplayManager();
 
+            // Harmony patch (unchanged)
             try
             {
                 var h = new Harmony("SaberSurgeon.Endless");
@@ -81,9 +83,8 @@ namespace SaberSurgeon
             {
                 Log.Error($"SaberSurgeon: Harmony patch error: {ex}");
             }
-
-
         }
+
 
 
         private void OnMenuSceneActive()

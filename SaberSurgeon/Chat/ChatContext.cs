@@ -3,6 +3,13 @@
     /// <summary>
     /// Metadata for a single chat message, extracted from ChatPlex IChatMessage.
     /// </summary>
+    public enum ChatSource
+    {
+        Unknown,
+        NativeTwitch,
+        ChatPlex
+    }
+
     public class ChatContext
     {
         public string SenderName { get; set; } = "Unknown";
@@ -17,8 +24,10 @@
         // Bits / cheers
         public int Bits { get; set; }
 
-        // Raw data if you ever need it
+        // Raw data
         public object RawService { get; set; }
         public object RawMessage { get; set; }
+
+        public ChatSource Source { get; set; } = ChatSource.Unknown;
     }
 }

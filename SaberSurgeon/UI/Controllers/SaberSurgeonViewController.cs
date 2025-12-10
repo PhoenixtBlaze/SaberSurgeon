@@ -2,11 +2,13 @@
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
 using SaberSurgeon.Chat;
+using SaberSurgeon.Twitch;
+using System.IO;
+using System.Reflection;
+using System.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Reflection;
-using TMPro;
-using System.IO;
 
 
 namespace SaberSurgeon.UI.Controllers
@@ -113,6 +115,10 @@ namespace SaberSurgeon.UI.Controllers
         private static readonly Sprite FlashbangOnSprite =
             LoadEmbeddedSprite("SaberSurgeon.Assets.FlashbangGB.png");
 
+
+
+        private string _twitchChannel = string.Empty;
+        private string _twitchStatusText = "<color=#FF4444>Not connected</color>";
 
 
         // === Play time slider ===
@@ -465,6 +471,7 @@ namespace SaberSurgeon.UI.Controllers
             }
 
             // Apply correct sprite & color for current state
+            
             UpdateRainbowButtonVisual();
             UpdateGhostButtonVisual();
             UpdateBombButtonVisual();
@@ -473,6 +480,7 @@ namespace SaberSurgeon.UI.Controllers
             UpdateSuperFastButtonVisual();
             UpdateSlowerButtonVisual();
             UpdateFlashbangButtonVisual();
+            RefreshTwitchStatusText();
 
         }
 
@@ -647,7 +655,94 @@ namespace SaberSurgeon.UI.Controllers
 
 
 
-        // === Actions ===
+
+
+
+
+        // --- Twitch Integration Section ---
+
+        [UIValue("TwitchStatusText")]
+        public string TwitchStatusText
+        {
+            get => _twitchStatusText;
+            private set
+            {
+                _twitchStatusText = value;
+                NotifyPropertyChanged(nameof(TwitchStatusText));
+            }
+        }
+
+        private bool IsTwitchConnected()
+        {
+            return TwitchAuthManager.Instance.IsAuthenticated;
+        }
+
+
+        private void RefreshTwitchStatusText()
+        {
+            Plugin.Log.Info(
+                $"UI: RefreshTwitchStatusText IsAuthenticated={TwitchAuthManager.Instance.IsAuthenticated}, " +
+                $"Tier={Plugin.Settings.CachedSupporterTier}");
+
+            if (!IsTwitchConnected())
+            {
+                TwitchStatusText = "<color=#FF4444>Not connected</color>";
+                return;
+            }
+
+            var name = TwitchApiClient.Instance.BroadcasterName
+                       ?? Plugin.Settings.CachedBroadcasterLogin
+                       ?? "Unknown";
+
+            int tier = Plugin.Settings.CachedSupporterTier;
+
+            if (tier > 0)
+                TwitchStatusText = $"<color=#44FF44>Connected (Tier {tier})</color>";
+            else
+                TwitchStatusText = "<color=#44FF44>Connected</color>";
+        }
+
+
+
+
+
+        [UIAction("OnConnectTwitchClicked")]
+        private void OnConnectTwitchClicked()
+        {
+            _ = ConnectTwitchAsync();
+        }
+
+        private async Task ConnectTwitchAsync()
+        {
+            TwitchStatusText = "<color=#FFFF44>Opening browser...</color>";
+            await TwitchAuthManager.Instance.InitiateLogin();
+
+            // Wait up to ~10 seconds for auth + Helix to complete
+            const int maxWaitMs = 10000;
+            int waited = 0;
+            const int step = 500;
+
+            while (waited < maxWaitMs && !TwitchAuthManager.Instance.IsAuthenticated)
+            {
+                await Task.Delay(step);
+                waited += step;
+            }
+
+            // Give a bit of extra time for FetchBroadcasterAndSupportInfo to fill tier/name
+            await Task.Delay(1000);
+
+            RefreshTwitchStatusText();
+
+            // Restart chat so it can pick up CachedBroadcasterId and use native WS
+            var chatManager = ChatManager.GetInstance();
+            chatManager.Shutdown();
+            chatManager.Initialize();
+        }
+
+
+
+        // --- Endless Mode Section ---
+
 
         [UIAction("OnRainbowButtonClicked")]
         private void OnRainbowButtonClicked()

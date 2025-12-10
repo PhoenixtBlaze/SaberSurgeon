@@ -20,7 +20,6 @@ namespace SaberSurgeon.Chat
         // Bomb command keyword (without leading '!')
         public static string BombCommandName { get; set; } = "bomb";
 
-
         // Settings controlled by the SaberSurgeon menu
         public static bool PerCommandCooldownsEnabled { get; set; } = false;
 
@@ -30,13 +29,14 @@ namespace SaberSurgeon.Chat
 
         // Rainbow command toggle
         public static bool RainbowEnabled { get; set; } = true;
+
         // Rainbow cooldowns 
         public static bool RainbowCooldownEnabled { get; set; } = true;
         public static float RainbowCooldownSeconds { get; set; } = 60f;
 
-
         // Disappearing arrows command toggle
         public static bool DisappearEnabled { get; set; } = true;
+
         // Disappearing arrows cooldown
         public static bool DisappearCooldownEnabled { get; set; } = true;
         public static float DisappearCooldownSeconds { get; set; } = 60f;
@@ -46,7 +46,6 @@ namespace SaberSurgeon.Chat
         public static bool GhostCooldownEnabled { get; set; } = true;
         public static float GhostCooldownSeconds { get; set; } = 60f;
 
-
         // Bomb command toggle + cooldown
         public static bool BombEnabled { get; set; } = true;
         public static bool BombCooldownEnabled { get; set; } = true;
@@ -55,7 +54,6 @@ namespace SaberSurgeon.Chat
         // Faster command toggle + cooldown
         public static bool FasterEnabled { get; set; } = false;
         public static float FasterCooldownSeconds { get; set; } = 60f;
-
 
         // SuperFast command
         public static bool SuperFastEnabled { get; set; } = false;
@@ -214,7 +212,7 @@ namespace SaberSurgeon.Chat
                     Plugin.Log.Debug($"CommandHandler: Unknown command: !{commandName}");
                     return;
                 }
-                                
+
                 // owner bypass
                 bool isadmin = string.Equals(
                     context?.SenderName,
@@ -233,26 +231,30 @@ namespace SaberSurgeon.Chat
                     return;
                 }
 
+                // Optional: log which backend this message came from
+                string sourceLabel = context?.Source.ToString() ?? "Unknown";
+
                 Plugin.Log.Info(
                     $"CommandHandler: Executing !{commandName} from {context.SenderName} " +
-                    $"(Mod={context.IsModerator}, VIP={context.IsVip}, Sub={context.IsSubscriber}, Bits={context.Bits})");
+                    $"(Source={sourceLabel}, Mod={context.IsModerator}, VIP={context.IsVip}, " +
+                    $"Sub={context.IsSubscriber}, Bits={context.Bits})");
 
                 var handler = _commands[commandName];
 
-                // NEW: handler returns true only if effect actually triggered / command “succeeded”
+                // handler returns true only if effect actually triggered / command “succeeded”
                 bool succeeded = handler != null && handler(context, messageText);
 
                 if (succeeded && !isadmin && !skipCooldown)
                 {
                     SetCommandCooldown(commandName);
                 }
-
             }
             catch (Exception ex)
             {
                 Plugin.Log.Error($"CommandHandler: Error processing command:  {ex.Message}");
             }
         }
+
 
 
         private bool IsOtherSpeedEffectActive(string thisKey)

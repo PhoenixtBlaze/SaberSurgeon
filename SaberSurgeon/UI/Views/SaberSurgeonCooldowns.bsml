@@ -86,13 +86,13 @@
 					  pref-width="15" />
 
 				<!-- Editable text field -->
-				<!--string-setting
+				<string-setting
 					text=""
 					value="rainbow_command"
 					max-length="20"
 					apply-on-change="true"
 					pref-width="15"
-					hover-hint="command to use for RGB/Rainbow notes" /-->
+					hover-hint="command to use for RGB/Rainbow notes" />
 
 				<!-- Increment for the numeric value -->
 				<increment-setting
@@ -106,10 +106,10 @@
 					apply-on-change="true" />
 
 				<!-- Button after slider -->
-				<!--button text="Edit Visuals"
+				<button text="Edit Visuals"
 						on-click="OnRainbowEditVisualsClicked"
 						pref-width="18"
-						pref-height="8" /-->
+						pref-height="8" />
 			</horizontal>
 
 			<!-- Ghost -->
