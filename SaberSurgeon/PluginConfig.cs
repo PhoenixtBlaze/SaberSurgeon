@@ -99,6 +99,10 @@ namespace SaberSurgeon
         public virtual bool BsrCommandAliasEnabled { get; set; } = true;
 
 
-
+        public virtual bool PlayFirstSubmitLaterEnabled { get; set; } = true;
+        public virtual bool ScoreSubmissionEnabled { get; set; } = true;
+        public virtual bool AutoPauseOnMapEnd { get; set; } = true;
+        
+        
     }
 }

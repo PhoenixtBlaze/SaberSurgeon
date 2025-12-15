@@ -225,12 +225,14 @@ namespace SaberSurgeon.HarmonyPatches
             {
                 var watchdog = gameNote.gameObject.AddComponent<RendererWatchdog>();
 
-                // Use the bomb command cooldown as the watchdog duration
-                float seconds = SaberSurgeon.Chat.CommandHandler.BombCooldownSeconds;
-                if (seconds <= 0f) seconds = 10.0f; // sane fallback
+                watchdog.Init(gameNote.transform, 1.0f); // Only monitor first 0.5 seconds
 
-                watchdog.Init(gameNote.transform, seconds, bombNode);
-                Plugin.Log.Info($"BombNotePatch: Watchdog started for {seconds:F1}s (ignoring SaberSurgeon_BombVisual)");
+                // Use the bomb command cooldown as the watchdog duration
+                //float seconds = SaberSurgeon.Chat.CommandHandler.BombCooldownSeconds;
+                //if (seconds <= 0f) seconds = 1.0f; // sane fallback
+
+                //watchdog.Init(gameNote.transform, seconds, bombNode);
+                Plugin.Log.Info($"BombNotePatch: Watchdog started for 1s (ignoring SaberSurgeon_BombVisual)");
             }
 
             else

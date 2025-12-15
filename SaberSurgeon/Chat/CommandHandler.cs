@@ -16,6 +16,10 @@ namespace SaberSurgeon.Chat
         private bool _isInitialized = false;
         private delegate bool CommandDelegate(object ctxObj, string fullCommand);
 
+        //Add lock object for thread-safe cooldown tracking
+        //private static readonly object _cooldownDictLock = new object();
+        //private static readonly Dictionary<string, float> _cooldownDict = new Dictionary<string, float>();
+
 
         // Bomb command keyword (without leading '!')
         public static string BombCommandName { get; set; } = "bomb";

@@ -1,4 +1,7 @@
-﻿using SongCore;
+﻿using SaberSurgeon.Chat;
+using SaberSurgeon.HarmonyPatches;
+using SaberSurgeon.Integrations;
+using SongCore;
 using SongCore.Utilities;
 using System;
 using System.Collections;
@@ -187,6 +190,8 @@ namespace SaberSurgeon.Gameplay
         {
             Plugin.Log.Info("GameplayManager: Stopping Endless Mode");
             _isPlaying = false;
+            _remainingTime = 0f;
+            FasterSongPatch.ClearCache();
 
             if (_gameplayCoroutine != null)
             {
@@ -211,6 +216,7 @@ namespace SaberSurgeon.Gameplay
             _inLevelQueueProcessor?.StopProcessing();
             _currentSongRequest = null;
 
+            Plugin.Log.Info("GameplayManager: Endless Mode stopped");
         }
 
 
@@ -339,23 +345,23 @@ namespace SaberSurgeon.Gameplay
             pd.LastDownloadAttemptUtc = DateTime.UtcNow;
 
             // Try BeatSaverDownloader bridge first. [file:149]
-            if (SaberSurgeon.Integrations.BeatSaverDownloaderBridge.TryDownloadByKey(key, out var reason))
+            // In the method that triggers downloads:
+            if (BeatSaverDownloaderBridge.TryDownloadByKey(key, out string error))
             {
-                pd.DownloadStarted = true;
-                pd.LastError = null;
-
-                // Also start fetching the hash so we can resolve via SongCore.Collections.levelIDsForHash. [file:146]
-                if (!pd.HashFetchStarted)
-                {
-                    pd.HashFetchStarted = true;
-                    StartCoroutine(FetchBeatSaverHashCoroutine(key, pd));
-                }
-
-                return;
+                Plugin.Log.Info($"GameplayManager: Queued download for {key}");
+                // Send success message to chat
+                ChatManager.GetInstance().SendChatMessage($"!!Queued download: {key}");
+            }
+            else
+            {
+                Plugin.Log.Error($"GameplayManager: Download failed - {error}");
+                // Send failure message to chat
+                ChatManager.GetInstance().SendChatMessage($"!!Download failed: {error}");
             }
 
-            pd.LastError = reason;
-            Plugin.Log.Warn($"GameplayManager: Download start failed for {key}: {reason}");
+
+            pd.LastError = error;
+            Plugin.Log.Warn($"GameplayManager: Download start failed for {key}: {error}");
         }
 
         private IEnumerator FetchBeatSaverHashCoroutine(string key, PendingDownload pd)
@@ -681,9 +687,9 @@ namespace SaberSurgeon.Gameplay
             _isLoadingSong = true;
             _lastLevelEndAction = LevelCompletionResults.LevelEndAction.None;
 
-            // If current song was a request with a segment length, arm the in-level switch timer.
-            // (If null, switching is disabled for this segment.)
-            _inLevelQueueProcessor?.ArmForCurrentSegment(_currentSongRequest?.SegmentLengthSeconds);
+            // Use SwitchAfterSeconds for mid-song switching (single time m:ss).
+            // If you later implement segment insertion, you can arm with SegmentLengthSeconds too.
+            _inLevelQueueProcessor?.ArmForCurrentSegment(_currentSongRequest?.SwitchAfterSeconds);
 
             Plugin.Log.Info($"GameplayManager: Playing level: {level.songName}");
 

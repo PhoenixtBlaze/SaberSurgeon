@@ -3,9 +3,19 @@ using UnityEngine;
 
 namespace SaberSurgeon.Gameplay
 {
+    /// <summary>
+    /// Monitors renderer state changes and logs conflicts (non-invasive monitoring).
+    /// Does NOT override state changes from other systems; only reports them.
+    /// </summary>
     public class RendererWatchdog : MonoBehaviour
     {
-        private class Entry { public MeshRenderer mr; public bool lastEnabled; }
+        private class Entry
+        {
+            public MeshRenderer mr;
+            public bool lastEnabled;
+            public bool isManaged; // true if SaberSurgeon is managing this renderer
+        }
+
         private readonly List<Entry> _entries = new List<Entry>();
         private float _endTime;
         private Transform _root;
@@ -22,7 +32,16 @@ namespace SaberSurgeon.Gameplay
             {
                 if (r == null) continue;
                 if (_ignoreRoot != null && r.transform.IsChildOf(_ignoreRoot)) continue;
-                _entries.Add(new Entry { mr = r, lastEnabled = r.enabled });
+
+                // Mark NoteCube as managed by SaberSurgeon (bomb effect)
+                bool isManaged = r.name == "NoteCube";
+
+                _entries.Add(new Entry
+                {
+                    mr = r,
+                    lastEnabled = r.enabled,
+                    isManaged = isManaged
+                });
             }
 
             _endTime = Time.unscaledTime + seconds;
@@ -44,16 +63,23 @@ namespace SaberSurgeon.Gameplay
             foreach (var e in _entries)
             {
                 if (e.mr == null) continue;
-                if (e.mr.name == "NoteCube")
+
+                // Only enforce state on renderers SaberSurgeon manages
+                if (e.isManaged && e.mr.name == "NoteCube")
                 {
-                    //Plugin.Log.Warn($"RendererWatchdog: Forcing {e.mr.name} back to disabled on bomb note");
-                    e.mr.enabled = false;
+                    if (e.mr.enabled != false) // Should stay disabled during bomb
+                    {
+                        Plugin.Log.Debug($"RendererWatchdog: NoteCube state changed by external source, re-enforcing disable");
+                        e.mr.enabled = false;
+                    }
                     e.lastEnabled = false;
                     continue;
                 }
+
+                // For non-managed renderers, just report conflicts (don't override)
                 if (e.mr.enabled != e.lastEnabled)
                 {
-                    Plugin.Log.Warn($"RendererWatchdog: '{e.mr.name}' enabled changed {e.lastEnabled} -> {e.mr.enabled} (path: {GetPath(e.mr.transform)})");
+                    Plugin.Log.Warn($"RendererWatchdog: External mod modified '{e.mr.name}' (enabled: {e.lastEnabled} → {e.mr.enabled})");
                     e.lastEnabled = e.mr.enabled;
                 }
             }

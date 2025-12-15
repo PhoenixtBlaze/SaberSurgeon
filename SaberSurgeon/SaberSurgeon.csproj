@@ -281,6 +281,7 @@
     <Compile Include="Gameplay\GhostVisualController.cs" />
     <Compile Include="Gameplay\InLevelQueueProcessor.cs" />
     <Compile Include="Gameplay\LookAtCamera.cs" />
+    <Compile Include="Gameplay\PlayFirstSubmitLaterManager.cs" />
     <Compile Include="Gameplay\RainbowManager.cs" />
     <Compile Include="Gameplay\RendererWatchdog.cs" />
     <Compile Include="Gameplay\SaberSurgeonTextMover.cs" />
@@ -300,10 +301,12 @@
     <Compile Include="Twitch\TwitchAuthManager.cs" />
     <Compile Include="Twitch\TwitchEventSubClient.cs" />
     <Compile Include="UI\Controllers\ChatOverlayViewController.cs" />
+    <Compile Include="UI\Controllers\PlayFirstSubmitLaterViewController.cs" />
     <Compile Include="UI\Controllers\SaberSurgeonCooldownViewController.cs" />
     <Compile Include="UI\Controllers\SaberSurgeonViewController.cs" />
     <Compile Include="UI\FloatingChatOverlay.cs" />
     <Compile Include="UI\FlowCoordinator\SaberSurgeonFlowCoordinator.cs" />
+    <Compile Include="UI\Settings\PlayFirstSubmitLaterSettingsHost.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="manifest.json" />
@@ -314,6 +317,7 @@
     <EmbeddedResource Include="UI\Views\SaberSurgeonSettings.bsml" />
     <EmbeddedResource Include="UI\Views\SaberSurgeonCooldowns.bsml" />
     <EmbeddedResource Include="UI\Views\FloatingChat.bsml" />
+    <EmbeddedResource Include="UI\Views\PlayFirstSubmitLaterGameplaySetup.bsml" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BeatSaberModdingTools.Tasks">

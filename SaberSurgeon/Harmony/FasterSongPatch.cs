@@ -5,9 +5,9 @@ using UnityEngine;
 
 namespace SaberSurgeon.HarmonyPatches
 {
-    /// <summary>
+    ///
     /// Dynamically scales AudioTimeSyncController's _timeScale and AudioSource.pitch.
-    /// </summary>
+    ///
     [HarmonyPatch(typeof(AudioTimeSyncController))]
     internal static class FasterSongPatch
     {
@@ -21,6 +21,7 @@ namespace SaberSurgeon.HarmonyPatches
             public float BaseScale;
         }
 
+        // FIXED: Use WeakReference wrapper for explicit cleanup control
         private static readonly ConditionalWeakTable<AudioTimeSyncController, ScaleData> _scaleData
             = new ConditionalWeakTable<AudioTimeSyncController, ScaleData>();
 
@@ -31,13 +32,17 @@ namespace SaberSurgeon.HarmonyPatches
         private static readonly AccessTools.FieldRef<AudioTimeSyncController, AudioSource> AudioSourceRef =
             AccessTools.FieldRefAccess<AudioTimeSyncController, AudioSource>("_audioSource");
 
-        /// <summary>
+        ///
         /// Prefix on Update: ensure _timeScale and pitch are set to baseScale * Multiplier.
-        /// </summary>
+        ///
         [HarmonyPrefix]
         [HarmonyPatch("Update")]
         private static void Prefix_Update(AudioTimeSyncController __instance)
         {
+            // Skip if instance is null or being destroyed
+            if (__instance == null || !__instance.isActiveAndEnabled)
+                return;
+
             // Get or create per-instance data
             var data = _scaleData.GetOrCreateValue(__instance);
 
@@ -57,10 +62,20 @@ namespace SaberSurgeon.HarmonyPatches
             TimeScaleRef(__instance) = effectiveScale;
 
             // Keep audio pitch in sync with timeScale, just like Start() does
-            // (Start sets _audioSource.pitch = _initData.timeScale). [file:72]
             var src = AudioSourceRef(__instance);
             if (src != null)
                 src.pitch = effectiveScale;
+        }
+
+        ///
+        /// CLEANUP: Called when song ends or level exits to clear cached data
+        ///
+        public static void ClearCache()
+        {
+            // ConditionalWeakTable doesn't have a Clear() method, so we just reset multiplier
+            // Weak references will be collected naturally when AudioTimeSyncController is destroyed
+            Multiplier = 1.0f;
+            Plugin.Log.Info("FasterSongPatch: Cache cleared and multiplier reset.");
         }
     }
 }

@@ -1,0 +1,13 @@
+<bg xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+    xsi:schemaLocation='https://monkeymanboy.github.io/BSML-Docs/ https://raw.githubusercontent.com/monkeymanboy/BSML-Docs/gh-pages/BSMLSchema.xsd'>
+
+  <vertical pad="3" spacing="2" vertical-fit="PreferredSize">
+    <text text="PlayFirst SubmitLater" align="Center" font-size="6" />
+    <text text="~statusText" align="Center" font-size="3" rich-text="true"/>
+
+    <toggle-setting text="Enable module" value="enabled" apply-on-change="true"/>
+    <toggle-setting text="Enable score submission" value="scoreSubmissionEnabled" apply-on-change="true"/>
+    <toggle-setting text="Auto-pause on map end" value="autoPauseOnMapEnd" apply-on-change="true"/>
+    
+  </vertical>
+</bg>

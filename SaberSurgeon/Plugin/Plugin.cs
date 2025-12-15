@@ -1,18 +1,21 @@
 ﻿using BeatSaberMarkupLanguage;
+using BeatSaberMarkupLanguage.GameplaySetup;
 using BeatSaberMarkupLanguage.MenuButtons;
+using BeatSaberMarkupLanguage.Settings;
 using BeatSaberMarkupLanguage.Util;
+using BS_Utils.Utilities;
 using HarmonyLib;
 using IPA;
 using IPA.Config.Stores;
 using IPA.Logging;
 using SaberSurgeon.Chat;
-using System.Collections;
+using SaberSurgeon.Gameplay;
 using SaberSurgeon.UI.FlowCoordinators;
+using SaberSurgeon.UI.Settings;
 using System;
+using System.Collections;
 using System.Linq;
 using UnityEngine;
-using BS_Utils.Utilities;
-using SaberSurgeon.Gameplay;
 
 
 
@@ -23,6 +26,8 @@ namespace SaberSurgeon
     {
         internal static Plugin Instance { get; private set; }
         internal static IPA.Logging.Logger Log { get; private set; }
+
+        private bool pfslTabRegisteredThisMenu = false;
 
         // Raw BSIPA config object (kept for compatibility if ever need it)
         internal static IPA.Config.Config Configuration { get; private set; }
@@ -75,6 +80,9 @@ namespace SaberSurgeon
             // 3) Gameplay manager
             InitializeGameplayManager();
 
+            _ = SaberSurgeon.Gameplay.PlayFirstSubmitLaterManager.Instance;
+
+
             // Harmony patch (unchanged)
             try
             {
@@ -86,18 +94,68 @@ namespace SaberSurgeon
             {
                 Log.Error($"SaberSurgeon: Harmony patch error: {ex}");
             }
+
+
         }
 
 
-
+        private bool _pfslTabRegistered;
         private void OnMenuSceneActive()
         {
             Log.Info("SaberSurgeon : menuSceneActive");
             _menuButtonRegisteredThisMenu = false;
+            pfslTabRegisteredThisMenu = false;
 
+            
             // Run a small coroutine on the game’s main thread
             CoroutineHost.Instance.StartCoroutine(RegisterMenuButtonWhenReady());
+            CoroutineHost.Instance.StartCoroutine(RegisterPfslGameplaySetupTabWhenReady());
+
+            if (_pfslTabRegistered) return;
+
+            // Ensure your standalone PFSL runtime module exists if you want it initialized early
+            _ = Gameplay.PlayFirstSubmitLaterManager.Instance;
+            _pfslTabRegistered = true;
         }
+
+        private IEnumerator RegisterPfslGameplaySetupTabWhenReady()
+        {
+            while (!pfslTabRegisteredThisMenu)
+            {
+                // Wait a frame so Zenject/BSML can finish installing menu bindings
+                yield return null;
+
+                try
+                {
+                    // This line is safe to run early; it just ensures your module exists
+                    _ = PlayFirstSubmitLaterManager.Instance;
+
+                    // If BSML isn't ready, the next call may throw InvalidOperationException.
+                    var gs = BeatSaberMarkupLanguage.GameplaySetup.GameplaySetup.Instance;
+                    if (gs == null) continue;
+
+                    gs.AddTab(
+                        "Submit Later",
+                        "SaberSurgeon.UI.Views.PlayFirstSubmitLaterGameplaySetup.bsml",
+                        SaberSurgeon.UI.Settings.PlayFirstSubmitLaterSettingsHost.Instance
+                    );
+
+                    pfslTabRegisteredThisMenu = true;
+                    Log.Info("PlayFirstSubmitLater: GameplaySetup tab registered (delayed)");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // This matches your existing “too early” handling style for MenuButtons
+                    Log.Debug("PlayFirstSubmitLater: GameplaySetup not ready yet: " + ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("PlayFirstSubmitLater: Failed registering GameplaySetup tab: " + ex);
+                    yield break;
+                }
+            }
+        }
+
 
         private IEnumerator RegisterMenuButtonWhenReady()
         {
@@ -207,7 +265,7 @@ namespace SaberSurgeon
             try
             {
                 BSEvents.menuSceneActive -= OnMenuSceneActive;
-
+                //BSMLSettings.Instance.RemoveSettingsMenu(PlayFirstSubmitLaterSettingsHost.Instance);
                 CommandHandler.Instance.Shutdown();
                 ChatManager.GetInstance().Shutdown();
                 Gameplay.GameplayManager.GetInstance().Shutdown();
