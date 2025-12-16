@@ -1,6 +1,6 @@
 # Saber Surgeon
 
-Saber Surgeon is a Beat Saber mod inspired by [GameplayModifiersPlus](https://github.com/Kylemc1413/GameplayModifiersPlus) and [StreamPartyCommands](https://github.com/denpadokei/StreamPartyCommand) it lets your Twitch chat directly mess with your gameplay in real time. Viewers can trigger rainbow notes, disappearing arrows, ghost notes, bomb “pranks”, flashbangs, and speed changes using simple chat commands, while you keep full control over what is allowed and how often it can happen.
+Saber Surgeon is a Beat Saber mod mainly inspired by [GameplayModifiersPlus](https://github.com/Kylemc1413/GameplayModifiersPlus) and [StreamPartyCommands](https://github.com/denpadokei/StreamPartyCommand). It also has some other extra Features that I really wanted in the newer versions so i added them as well. SaberSurgeon lets your Twitch chat directly mess with your gameplay in real time. Viewers can trigger rainbow notes, disappearing arrows, ghost notes, bomb “pranks”, flashbangs, and speed changes using simple chat commands, while you keep full control over what is allowed and how often it can happen.
 
 
 
