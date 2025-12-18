@@ -3,12 +3,14 @@
   "id": "SaberSurgeon",
   "name": "SaberSurgeon",
   "author": "PhoenixBlaze0",
-  "version": "0.0.1",
-  "description": "Twitch chat-driven gameplay modifiers: rainbow / note colors, ghost notes, disappearing arrows, bombs, speed changes, flashbang lights, and endless play sessions.",
+  "version": "0.2.0",
+  "description": "Twitch chat-driven gameplay modifiers: rainbow/RGB note colors, custom note colors, ghost notes, disappearing arrows, bomb pranks, speed changes (faster/superfast/slower), flashbang lights, moderator controls, command management, and endless play sessions.",
   "gameVersion": "1.40.8",
   "dependsOn": {
     "BSIPA": "^4.3.6",
-    "BeatSaberMarkupLanguage": "^1.12.5"
+    "BeatSaberMarkupLanguage": "^1.12.5",
+    "BS Utils": "^1.14.2",
+    "ChatPlexSDK_BS": "^6.4.2"
   },
   "loadAfter": [
     "SongCore",

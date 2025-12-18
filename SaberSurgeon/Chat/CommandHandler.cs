@@ -83,6 +83,19 @@ namespace SaberSurgeon.Chat
         public static bool RequestAllowSpecificTime { get; set; } = true;
 
 
+        // ===== GLOBAL ENABLE/DISABLE SYSTEM =====
+        /// <summary>
+        /// Stores the state of each command before global disable.
+        /// Key: command name (lowercase), Value: was enabled?
+        /// </summary>
+        private static readonly Dictionary<string, bool> _commandStateBeforeDisable =
+            new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// When true, all commands are disabled globally (except !surgeon enable/disable).
+        /// </summary>
+        public static bool GlobalDisableActive { get; private set; } = false;
+
 
 
 
@@ -472,14 +485,38 @@ namespace SaberSurgeon.Chat
         private bool HandleSurgeonCommand(object ctxObj, string fullCommand)
         {
             var ctx = ctxObj as ChatContext;
+            var parts = fullCommand.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
+            // Check for subcommands: !surgeon disable, !surgeon enable, !surgeon <cmd> <enable|disable>
+            if (parts.Length >= 2)
+            {
+                string subcommand = parts[1].ToLowerInvariant();
+
+                if (subcommand == "disable")
+                {
+                    return HandleSurgeonDisable(ctxObj, fullCommand);
+                }
+                else if (subcommand == "enable")
+                {
+                    return HandleSurgeonEnable(ctxObj, fullCommand);
+                }
+                else if (parts.Length >= 3 && (parts[2].ToLowerInvariant() == "enable" ||
+                                                parts[2].ToLowerInvariant() == "disable" ||
+                                                parts[2].ToLowerInvariant() == "on" ||
+                                                parts[2].ToLowerInvariant() == "off"))
+                {
+                    // Per-command toggle: !surgeon <cmd> <enable|disable>
+                    return HandleSurgeonCommandToggle(ctxObj, fullCommand);
+                }
+            }
+
+            // Default: show status
             string msg = BuildSurgeonStatusMessage();
-
             Plugin.Log.Info($"Surgeon command executed by {ctx?.SenderName ?? "Unknown"}");
             ChatManager.GetInstance().SendChatMessage(msg);
-
             return true;
         }
+
 
         private string BuildSurgeonStatusMessage()
         {
@@ -527,8 +564,11 @@ namespace SaberSurgeon.Chat
 
             string backend = ChatManager.GetInstance()?.ActiveBackend.ToString() ?? "Unknown";
             string version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "unknown";
+            string globalStatus = GlobalDisableActive ? " [GLOBALLY DISABLED]" : "";
 
-            return $"!SaberSurgeon v{version} | Enabled Commands: {commandsPart} | {noteColorHelp}";
+
+            return $"!SaberSurgeon v{version}{globalStatus} | Enabled Commands: {commandsPart} | {noteColorHelp}";
+
         }
 
 
@@ -542,6 +582,14 @@ namespace SaberSurgeon.Chat
                 SendResponse(
                     "Flashbang command disabled via menu",
                     null);
+                return false;
+            }
+
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "Flashbang blocked: global disable active",
+                    "!!Flashbang is blocked by global disable. Use !surgeon enable to restore commands.");
                 return false;
             }
 
@@ -581,6 +629,14 @@ namespace SaberSurgeon.Chat
                 SendResponse(
                     "Faster command is disabled via menu",
                     null);
+                return false;
+            }
+
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "Faster blocked: global disable active",
+                    "!!Faster is blocked by global disable. Use !surgeon enable to restore commands.");
                 return false;
             }
 
@@ -633,6 +689,14 @@ namespace SaberSurgeon.Chat
                 return false;
             }
 
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "SuperFast blocked: global disable active",
+                    "!!SuperFast is blocked by global disable. Use !surgeon enable to restore commands.");
+                return false;
+            }
+
             var ctx = ctxObj as ChatContext;
 
             if (ctx == null) //(ctx != null && !(ctx.IsSubscriber || ctx.IsModerator || ctx.IsBroadcaster))
@@ -681,7 +745,13 @@ namespace SaberSurgeon.Chat
                     null);
                 return false;
             }
-
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "Slower blocked: global disable active",
+                    "!!Slower is blocked by global disable.");
+                return false;
+            }
             var ctx = ctxObj as ChatContext;
 
             if (ctx == null) //(ctx != null && !(ctx.IsSubscriber || ctx.IsModerator || ctx.IsBroadcaster))
@@ -742,7 +812,13 @@ namespace SaberSurgeon.Chat
                     null);
                 return false;
             }
-
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "Bomb blocked: global disable active",
+                    "!!Bombs are blocked by global disable.");
+                return false;
+            }
             string name = ctx?.SenderName ?? "Unknown";
 
             bool armed = Gameplay.BombManager.Instance.ArmBomb(name, BombCooldownSeconds);
@@ -783,6 +859,13 @@ namespace SaberSurgeon.Chat
                     null);
                 return false; // no cooldown
             }
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "Disappear blocked: global disable active",
+                    "!!Disappear is blocked by global disable.");
+                return false;
+            }
 
             // Block if ghost is already active
             if (Gameplay.GhostNotesManager.GhostActive)
@@ -819,6 +902,13 @@ namespace SaberSurgeon.Chat
                 SendResponse(
                     "Ghost command disabled via menu",
                     null);
+                return false;
+            }
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "Ghost blocked: global disable active",
+                    "!!Ghost is blocked by global disable.");
                 return false;
             }
 
@@ -873,6 +963,14 @@ namespace SaberSurgeon.Chat
                 SendResponse(
                     "Rainbow command is disabled via menu",
                     null);
+                return false;
+            }
+            // Check if global disable is active
+            if (GlobalDisableActive)
+            {
+                SendResponse(
+                    "Rainbow blocked: global disable active",
+                    "!!Rainbow is blocked by global disable.");
                 return false;
             }
 
@@ -974,7 +1072,7 @@ namespace SaberSurgeon.Chat
 
             if (!ok)
             {
-                SendResponse($"SR rejected: {reject}", $"!!Request rejected: {reject}");
+                //SendResponse($"SR rejected: {reject}", $"!!Request rejected: {reject}");
                 return false;
             }
 
@@ -1101,6 +1199,246 @@ namespace SaberSurgeon.Chat
                 return false; // treat error as failure → no cooldown
             }*/
         }
+
+        // ===== GLOBAL ENABLE/DISABLE HANDLERS =====
+
+        /// <summary>
+        /// Handle !surgeon disable - disables all active commands globally
+        /// </summary>
+        /// <summary>
+        /// Handle !surgeon disable - disables all active commands globally (MOD-ONLY)
+        /// </summary>
+        private bool HandleSurgeonDisable(object ctxObj, string fullCommand)
+        {
+            var ctx = ctxObj as ChatContext;
+
+            // MOD-ONLY permission check
+            if (ctx != null && !(ctx.IsModerator || ctx.IsBroadcaster))
+            {
+                SendResponse(
+                    $"Permission denied: {ctx.SenderName} attempted !surgeon disable",
+                    $"Sorry {ctx.SenderName}, !surgeon disable is a mods only command");
+                return false;
+            }
+
+            // Save current state and disable all
+            _commandStateBeforeDisable.Clear();
+
+            _commandStateBeforeDisable["rainbow"] = RainbowEnabled;
+            _commandStateBeforeDisable["disappear"] = DisappearEnabled;
+            _commandStateBeforeDisable["ghost"] = GhostEnabled;
+            _commandStateBeforeDisable["bomb"] = BombEnabled;
+            _commandStateBeforeDisable["faster"] = FasterEnabled;
+            _commandStateBeforeDisable["superfast"] = SuperFastEnabled;
+            _commandStateBeforeDisable["slower"] = SlowerEnabled;
+            _commandStateBeforeDisable["flashbang"] = FlashbangEnabled;
+            _commandStateBeforeDisable["notecolor"] = RainbowEnabled; // shares toggle with rainbow
+
+            // Disable all
+            RainbowEnabled = false;
+            DisappearEnabled = false;
+            GhostEnabled = false;
+            BombEnabled = false;
+            FasterEnabled = false;
+            SuperFastEnabled = false;
+            SlowerEnabled = false;
+            FlashbangEnabled = false;
+
+            GlobalDisableActive = true;
+
+            SendResponse(
+                $"Global disable",
+                $"!!Surgeon Disabled");
+
+            Plugin.Log.Info($"[CommandHandler] Global disable activated by {ctx?.SenderName}");
+            return true;
+        }
+
+
+        /// <summary>
+        /// Handle !surgeon enable - restores all commands to their pre-disable state (MOD-ONLY)
+        /// </summary>
+        private bool HandleSurgeonEnable(object ctxObj, string fullCommand)
+        {
+            var ctx = ctxObj as ChatContext;
+
+            // MOD-ONLY permission check
+            if (ctx != null && !(ctx.IsModerator || ctx.IsBroadcaster))
+            {
+                SendResponse(
+                    $"Permission denied: {ctx.SenderName} attempted !surgeon enable",
+                    $"Sorry {ctx.SenderName}, !surgeon enable is a mods only command");
+                return false;
+            }
+
+            if (!GlobalDisableActive)
+            {
+                SendResponse(
+                    "Global disable not active",
+                    "!!No commands are currently disabled. Use !surgeon disable to disable all.");
+                return false;
+            }
+
+            // Restore from saved state
+            if (_commandStateBeforeDisable.ContainsKey("rainbow"))
+                RainbowEnabled = _commandStateBeforeDisable["rainbow"];
+            if (_commandStateBeforeDisable.ContainsKey("disappear"))
+                DisappearEnabled = _commandStateBeforeDisable["disappear"];
+            if (_commandStateBeforeDisable.ContainsKey("ghost"))
+                GhostEnabled = _commandStateBeforeDisable["ghost"];
+            if (_commandStateBeforeDisable.ContainsKey("bomb"))
+                BombEnabled = _commandStateBeforeDisable["bomb"];
+            if (_commandStateBeforeDisable.ContainsKey("faster"))
+                FasterEnabled = _commandStateBeforeDisable["faster"];
+            if (_commandStateBeforeDisable.ContainsKey("superfast"))
+                SuperFastEnabled = _commandStateBeforeDisable["superfast"];
+            if (_commandStateBeforeDisable.ContainsKey("slower"))
+                SlowerEnabled = _commandStateBeforeDisable["slower"];
+            if (_commandStateBeforeDisable.ContainsKey("flashbang"))
+                FlashbangEnabled = _commandStateBeforeDisable["flashbang"];
+
+            _commandStateBeforeDisable.Clear();
+            GlobalDisableActive = false;
+
+            SendResponse(
+                $"Global enable activated by {ctx?.SenderName ?? "Unknown"}",
+                $"!!Surgeon Enabled");
+
+            Plugin.Log.Info($"[CommandHandler] Global enable activated by {ctx?.SenderName}");
+            return true;
+        }
+
+
+        /// <summary>
+        /// Handle per-command enable/disable: !surgeon rainbow disable, !surgeon bomb enable, etc.
+        /// </summary>
+        /// <summary>
+        /// Handle per-command enable/disable: !surgeon rainbow disable, !surgeon bomb enable, etc. (MOD-ONLY)
+        /// </summary>
+        /// <summary>
+        /// Handle per-command enable/disable: !surgeon rainbow disable, !surgeon bomb enable, etc. (MOD-ONLY)
+        /// </summary>
+        private bool HandleSurgeonCommandToggle(object ctxObj, string fullCommand)
+        {
+            var ctx = ctxObj as ChatContext;
+
+            // MOD-ONLY permission check
+            if (ctx != null && !(ctx.IsModerator || ctx.IsBroadcaster))
+            {
+                var parts = fullCommand.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                string firstCmd = parts.Length >= 2 ? parts[1].ToLowerInvariant() : "unknown";
+
+                SendResponse(
+                    $"Permission denied: {ctx.SenderName} attempted !surgeon {firstCmd}",
+                    $"Sorry {ctx.SenderName}, !surgeon {firstCmd} is a mods only command");
+                return false;
+            }
+
+            var parts_parse = fullCommand.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+            // Expected: !surgeon <targetCommand> <enable|disable>
+            if (parts_parse.Length < 3)
+            {
+                SendResponse(
+                    "Surgeon toggle: bad syntax",
+                    "!!Usage: !surgeon <command> <enable|disable>. Example: !surgeon rainbow disable");
+                return false;
+            }
+
+            string targetCommand = parts_parse[1].ToLowerInvariant();
+            string action = parts_parse[2].ToLowerInvariant();
+
+            bool enable = false;
+            if (action == "enable" || action == "on")
+                enable = true;
+            else if (action == "disable" || action == "off")
+                enable = false;
+            else
+            {
+                SendResponse(
+                    "Surgeon toggle: invalid action",
+                    $"!!Action must be 'enable' or 'disable', not '{action}'");
+                return false;
+            }
+
+            // Apply the toggle
+            string statusBefore = "";
+            bool found = true;
+
+            switch (targetCommand)
+            {
+                case "rainbow":
+                case "notecolor":
+                case "notecolour":
+                    statusBefore = RainbowEnabled ? "enabled" : "disabled";
+                    RainbowEnabled = enable;
+                    break;
+
+                case "disappear":
+                case "disappearingarrows":
+                    statusBefore = DisappearEnabled ? "enabled" : "disabled";
+                    DisappearEnabled = enable;
+                    break;
+
+                case "ghost":
+                case "ghostnotes":
+                    statusBefore = GhostEnabled ? "enabled" : "disabled";
+                    GhostEnabled = enable;
+                    break;
+
+                case "bomb":
+                    statusBefore = BombEnabled ? "enabled" : "disabled";
+                    BombEnabled = enable;
+                    break;
+
+                case "faster":
+                    statusBefore = FasterEnabled ? "enabled" : "disabled";
+                    FasterEnabled = enable;
+                    break;
+
+                case "superfast":
+                case "super":
+                    statusBefore = SuperFastEnabled ? "enabled" : "disabled";
+                    SuperFastEnabled = enable;
+                    break;
+
+                case "slower":
+                    statusBefore = SlowerEnabled ? "enabled" : "disabled";
+                    SlowerEnabled = enable;
+                    break;
+
+                case "flashbang":
+                case "flash":
+                    statusBefore = FlashbangEnabled ? "enabled" : "disabled";
+                    FlashbangEnabled = enable;
+                    break;
+
+                default:
+                    SendResponse(
+                        $"Surgeon toggle: unknown command '{targetCommand}'",
+                        $"!!Unknown command: {targetCommand}. Try: !surgeon <rainbow|disappear|ghost|bomb|faster|superfast|slower|flashbang> <enable|disable>");
+                    return false;
+            }
+
+            if (!found)
+            {
+                SendResponse(
+                    $"Surgeon toggle: command not found '{targetCommand}'",
+                    $"!!Command {targetCommand} not recognized.");
+                return false;
+            }
+
+            string newStatus = enable ? "enabled" : "disabled";
+            SendResponse(
+                $"Surgeon: !{targetCommand} {newStatus} by {ctx?.SenderName ?? "Unknown"}",
+                $"!!SaberSurgeon: !{targetCommand} is now {newStatus}");
+
+            Plugin.Log.Info($"[CommandHandler] !{targetCommand} toggled to {newStatus} by {ctx?.SenderName}");
+            return true;
+        }
+
+
+
 
         public void Shutdown()
         {
