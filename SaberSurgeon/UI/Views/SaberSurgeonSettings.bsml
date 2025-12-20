@@ -150,7 +150,7 @@
 					</horizontal>
 
 				</modifier-container>
-		</tab>
+			</tab>
 			<!-- TAB 3: Endless Mode(Disabled for now) -->
 			<!--
 			<tab tab-name="Endless" tags="saber-surgeon-tabs">

@@ -301,6 +301,7 @@
     <Compile Include="Gameplay\DisappearingArrowsManager.cs" />
     <Compile Include="Gameplay\DisappearingArrowsVisualController.cs" />
     <Compile Include="Gameplay\FasterSongManager.cs" />
+    <Compile Include="Gameplay\FireworksExplosionPool.cs" />
     <Compile Include="Gameplay\FlashbangManager.cs" />
     <Compile Include="Gameplay\FontBundleLoader.cs" />
     <Compile Include="Gameplay\GameplayManager.cs" />

@@ -277,8 +277,16 @@ namespace SaberSurgeon.HarmonyPatches
 
             EnsureRefs();
 
-            // Spawn explosion particles
-            SpawnBombExplosion(__instance, cutPoint, orientation, saber, cutDirVec);
+            // Get color from your settings (or default to Red)
+            Color fireworkColor = Plugin.Settings?.BombGradientStart ?? Color.red;
+
+            // Spawn the fireworks at the cut position
+            FireworksExplosionPool.Instance.Spawn(
+                cutPoint,          // Position where the saber hit
+                fireworkColor,     // Color
+                burstCount: 250,   // Number of particles
+                life: 2.0f         // Duration
+            );
 
             // Spawn flying username text
             SpawnFlyingUsername(bomber, cutPoint);
@@ -311,54 +319,6 @@ namespace SaberSurgeon.HarmonyPatches
             }
         }
 
-        private static void SpawnBombExplosion(
-            GameNoteController noteController,
-            Vector3 cutPoint,
-            Quaternion orientation,
-            Saber saber,
-            Vector3 cutDirVec)
-        {
-            if (_effectsSpawner == null) return;
-
-            try
-            {
-                // Access particles via reflection
-                var particlesField = AccessTools.Field(typeof(NoteCutCoreEffectsSpawner), "_noteCutParticlesEffect");
-                var particles = particlesField?.GetValue(_effectsSpawner) as NoteCutParticlesEffect;
-
-                if (particles == null)
-                {
-                    Plugin.Log.Warn("BombCutPatch: _noteCutParticlesEffect was null");
-                    return;
-                }
-
-                // Bright yellow explosion
-                Color color = Color.Lerp(Color.yellow, Color.white, 0.5f); // very bright
-                color.a = 1.0f;
-
-                Vector3 cutNormal = orientation * Vector3.up;
-                Vector3 saberDir = cutDirVec.normalized;
-                float saberSpeed = saber.bladeSpeedForLogic;
-                Vector3 moveVec = noteController.moveVec;
-
-                float lifetimeMultiplier = Mathf.Clamp(noteController.noteData.timeToNextColorNote + 0.2f, 0.7f, 3f) * 3.0f;
-
-                particles.SpawnParticles(
-                    cutPoint,
-                    cutNormal,
-                    saberDir,
-                    saberSpeed,
-                    moveVec,
-                    (Color32)color,
-                    200, // sparkleCount
-                    900, // explosionCount
-                    lifetimeMultiplier);
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.Error($"BombCutPatch: Error spawning explosion: {ex}");
-            }
-        }
 
         private static void SpawnFlyingUsername(string username, Vector3 cutPoint)
         {

@@ -1,11 +1,13 @@
 ﻿using BeatSaberMarkupLanguage;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
-using HMUI; // for ModalView
+using BeatSaberMarkupLanguage.Components.Settings;
+using HMUI;
 using SaberSurgeon.Chat;
 using SaberSurgeon.Gameplay;
 using SaberSurgeon.Twitch;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -190,14 +192,25 @@ namespace SaberSurgeon.UI.Controllers
             }
 
             if (_bombVisualsModal != null)
-            { 
+            {
                 _bombVisualsModal.Show(true);
+                StartCoroutine(RefreshBombFontDropdown());
+                StartBombFontPreview();
             }
             else
             {
                 Plugin.Log.Warn("Bomb visuals modal was null when trying to show it.");
             }
         }
+
+        [UIComponent("bomb-font-preview")]
+        private TMP_Text _bombFontPreview;
+
+        private Coroutine _bombFontPreviewCoroutine;
+
+        [UIComponent("bomb-font-dropdown")]
+        private DropDownListSetting _bombFontDropdown;
+
 
         [UIValue("bomb_text_height")]
         public float BombTextHeight
@@ -261,6 +274,7 @@ namespace SaberSurgeon.UI.Controllers
             {
                 FontBundleLoader.SetSelectedBombFontOption(value);
                 NotifyPropertyChanged(nameof(BombFontSelected));
+                ApplyBombFontPreviewStatic();
             }
         }
 
@@ -289,14 +303,106 @@ namespace SaberSurgeon.UI.Controllers
         }
 
 
+        private IEnumerator RefreshBombFontDropdown()
+        {
+            // If you don’t care about hot-swapping bundles during runtime, you can use EnsureLoadedAsync() instead.
+            var task = FontBundleLoader.ReloadAsync();
+            while (!task.IsCompleted) yield return null;
+
+            // Update BSML-bound properties
+            NotifyPropertyChanged(nameof(BombFontOptions));
+            NotifyPropertyChanged(nameof(BombFontSelected));
+
+            // Force the dropdown to rebuild its UI list
+            if (_bombFontDropdown != null)
+            {
+                _bombFontDropdown.Values = BombFontOptions;
+                _bombFontDropdown.UpdateChoices();
+                _bombFontDropdown.ReceiveValue();
+            }
+
+            ApplyBombFontPreviewStatic();
+        }
+
+        private void StartBombFontPreview()
+        {
+            StopBombFontPreview();
+
+            if (_bombFontPreview == null)
+                return;
+
+            ApplyBombFontPreviewStatic(); // apply font + scale immediately
+            _bombFontPreviewCoroutine = StartCoroutine(BombFontPreviewRoutine());
+        }
+
+        private void StopBombFontPreview()
+        {
+            if (_bombFontPreviewCoroutine != null)
+            {
+                StopCoroutine(_bombFontPreviewCoroutine);
+                _bombFontPreviewCoroutine = null;
+            }
+        }
+
+        private void ApplyBombFontPreviewStatic()
+        {
+            if (_bombFontPreview == null)
+                return;
+
+            // sample text
+            _bombFontPreview.text = "PreviewUsername";
+
+            // apply selected bomb font (loaded/selected by FontBundleLoader)
+            var font = SaberSurgeon.Gameplay.FontBundleLoader.BombUsernameFont;
+            if (font != null)
+            {
+                _bombFontPreview.font = font;
+                _bombFontPreview.fontSharedMaterial = font.material;
+            }
+
+            // mimic gameplay “shape” controls
+            _bombFontPreview.rectTransform.localScale = new Vector3(BombTextWidth, BombTextHeight, 1f);
+
+            // optional styling similar to your in-game text
+            _bombFontPreview.outlineWidth = 0.2f;
+            _bombFontPreview.outlineColor = Color.black;
+        }
+
+        private IEnumerator BombFontPreviewRoutine()
+        {
+            // If you want it to feel like your in-game 2s flight, keep this at 2.0
+            const float cycleSeconds = 2.0f;
+
+            while (_bombFontPreview != null && _bombFontPreview.gameObject.activeInHierarchy)
+            {
+                // 0..1..0..1...
+                float t = Mathf.PingPong(Time.unscaledTime / cycleSeconds, 1f);
+
+                // use your existing settings as the gradient endpoints
+                Color c = Color.Lerp(BombGradientStart, BombGradientEnd, t);
+                c.a = 1f;
+
+                _bombFontPreview.color = c;
+
+                // If user changes options while it’s open, keep it in sync.
+                // (Cheap enough to do every frame)
+                ApplyBombFontPreviewStatic();
+
+                yield return null;
+            }
+
+            _bombFontPreviewCoroutine = null;
+        }
+
+
 
         [UIAction("CloseBombVisuals")]
         private void CloseBombVisuals()
         {
             if (_bombVisualsModal != null)
-            {
                 _bombVisualsModal.Hide(true);
-            }
+
+            StopBombFontPreview();
         }
 
 

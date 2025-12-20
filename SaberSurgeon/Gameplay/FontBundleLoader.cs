@@ -75,9 +75,16 @@ namespace SaberSurgeon.Gameplay
         internal static void SetSelectedBombFontOption(string selection)
         {
             if (string.IsNullOrWhiteSpace(selection)) selection = DefaultSelectionValue;
-            if (SaberSurgeon.Plugin.Settings != null) SaberSurgeon.Plugin.Settings.BombFontType = selection;
-            if (_bundle != null) ApplySelectionFromConfig();
+
+            if (SaberSurgeon.Plugin.Settings != null)
+                SaberSurgeon.Plugin.Settings.BombFontType = selection;
+
+            if (_bundle != null)
+                ApplySelectionFromConfig();
+            else
+                _ = EnsureLoadedAsync(); // LoadAsync ends by ApplySelectionFromConfig()
         }
+
 
 
 
@@ -163,5 +170,28 @@ namespace SaberSurgeon.Gameplay
             if (BombUsernameFont != null) SaberSurgeon.Plugin.Log.Info($"FontBundleLoader: Selected bomb font '{BombUsernameFont.name}' (option='{selection}')");
             else SaberSurgeon.Plugin.Log.Warn($"FontBundleLoader: No usable font could be selected (option='{selection}')");
         }
+
+        internal static async Task ReloadAsync()
+        {
+            // Reset selection output
+            BombUsernameFont = null;
+
+            // Clear cached lists/maps
+            _fontsByName.Clear();
+            _fontOptions.Clear();
+
+            // Force next EnsureLoadedAsync() to run LoadAsync() again
+            _loadTask = null;
+
+            if (_bundle != null)
+            {
+                _bundle.Unload(true);
+                _bundle = null;
+            }
+
+            await EnsureLoadedAsync();
+        }
+
+
     }
 }

@@ -199,14 +199,15 @@
        moveable="true"
        size-delta-x="110"
        size-delta-y="60">
-		<scroll-view>
-		<vertical vertical-fit="PreferredSize" spacing="2" pad="2" pref-width="70">
-			<horizontal>
-				<text text="Bomb Visuals" align="Center" font-size="5" />
-			</horizontal>
+		<horizontal pad-bottom="50">
+			<text text="Bomb Visuals" align="Center" font-size="5" />
+		</horizontal>
+		<settings-scroll-view pad-left="45" pad-top="5">
+		<vertical vertical-fit="PreferredSize" horizontal-fit="PreferredSize" spacing="2" pad="2" pref-width="60">
+			
 
 			<!-- Text size / shape -->
-			<horizontal spacing="2" pad="0">
+			<horizontal spacing="1" pad="0">
 				<text text="Text height" align="Left" font-size="3" pref-width="25" />
 				<increment-setting
 					text=""
@@ -217,7 +218,7 @@
 					apply-on-change="true" />
 			</horizontal>
 
-			<horizontal spacing="2" pad="0">
+			<horizontal spacing="1" pad="0">
 				<text text="Text width" align="Left" font-size="3" pref-width="25" />
 				<increment-setting
 					text=""
@@ -229,7 +230,7 @@
 			</horizontal>
 
 			<!-- Spawn distance from player -->
-			<horizontal spacing="2" pad="0">
+			<horizontal spacing="1" pad="0">
 				<text text="Spawn distance" align="Left" font-size="3" pref-width="25" />
 				<increment-setting
 					text=""
@@ -241,40 +242,44 @@
 			</horizontal>
 
 			<!-- Font dropdown -->
-			<horizontal spacing="2" pad="0">
+			<horizontal spacing="1" pad="0">
 				<dropdown-list-setting
+					id="bomb-font-dropdown"
 					text="Font Style"
 					value="bomb_font_selected"
-					choices="bomb_font_options" 
+					choices="bomb_font_options"
 					apply-on-change="true"
 					hover-hint="Select the font for bomb text"/>
 			</horizontal>
-			
-			<text text="Text Colors Over Time (Start -> End)" align="Center" font-size="4" under-line="true" />
-
 			<!-- Gradient Colors -->
 			<horizontal>
-					<horizontal pad="2">
+					<horizontal pad="1">
 						<text text="Start"></text>
 						<color-setting
 							text=""
 							value="bomb_gradient_start"
 							apply-on-change="true"
-							hover-hint="Color at the start of the animation" />
+							hover-hint="Text Color Changes Over Time (Start -> End)" />
 					</horizontal>
 				
-					<horizontal pad="2">
+					<horizontal pad="1">
 						<text text="End"></text>
 						<color-setting
 							text=""
 							value="bomb_gradient_end"
 							apply-on-change="true"
-							hover-hint="Color at the end (fade out)" />
+							hover-hint="Text Colors Changes Over Time (Start -> End)" />
 					</horizontal>
 			</horizontal>
 		</vertical>
-		</scroll-view>
-		<horizontal child-force-expand-width="false" pad-top="50">
+		</settings-scroll-view>
+		<horizontal child-force-expand-width="false" pad-right="65">
+			<text id="bomb-font-preview"
+					text="PreviewUsername"
+					align="Center"
+					font-size="5" />
+		</horizontal>
+		<horizontal child-force-expand-width="false" pad-top="50" pad-right="85">
 			<button text="Close" pref-width="20" on-click="CloseBombVisuals" />
 		</horizontal>
 	</modal>
