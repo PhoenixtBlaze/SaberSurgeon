@@ -12,6 +12,12 @@ namespace SaberSurgeon.Gameplay
         private Material _particleMaterial;
         private readonly Queue<GameObject> _pool = new Queue<GameObject>();
 
+        // ← NEW: Dictionary of available textures
+        private static Dictionary<string, Texture2D> _particleTextures = new Dictionary<string, Texture2D>();
+
+        // ← NEW: Currently selected texture
+        private static string _selectedTextureType = "Default"; // Default to Sparkle
+
         public static FireworksExplosionPool Instance
         {
             get
@@ -24,6 +30,67 @@ namespace SaberSurgeon.Gameplay
             }
         }
 
+        // ← NEW: Load all particle textures from Beat Saber
+        public static void LoadAvailableTextures()
+        {
+            _particleTextures.Clear();
+
+            var allTextures = Resources.FindObjectsOfTypeAll<Texture2D>();
+
+            // These are the ones found in your logs
+            string[] targetNames = { "Sparkle", "Spark", "SmokeParticle", "Default-Particle" };
+
+            foreach (var targetName in targetNames)
+            {
+                var tex = allTextures.FirstOrDefault(t => t.name == targetName);
+                if (tex != null)
+                {
+                    if (!_particleTextures.ContainsKey(targetName))
+                    {
+                        _particleTextures[targetName] = tex;
+                        Plugin.Log.Info($"FireworksExplosionPool: Loaded texture '{targetName}' ({tex.width}x{tex.height})");
+                    }
+                }
+            }
+
+            if (_particleTextures.Count == 0)
+                Plugin.Log.Warn("FireworksExplosionPool: No particle textures loaded!");
+            else
+                Plugin.Log.Info($"FireworksExplosionPool: Loaded {_particleTextures.Count} particle textures: {string.Join(", ", _particleTextures.Keys)}");
+
+            // Load user's saved preference
+            string savedTexture = Plugin.Settings?.BombFireworksTextureType ?? "Sparkle";
+            SetTextureType(savedTexture);
+        }
+
+        // ← NEW: Get list of available texture options for UI dropdown
+        public static List<string> GetAvailableTextureTypes()
+        {
+            return _particleTextures.Keys.ToList();
+        }
+
+        // ← NEW: Set which texture type to use
+        public static void SetTextureType(string textureTypeName)
+        {
+            if (string.IsNullOrWhiteSpace(textureTypeName))
+                textureTypeName = "Sparkle";
+
+            if (_particleTextures.ContainsKey(textureTypeName))
+            {
+                _selectedTextureType = textureTypeName;
+                Plugin.Log.Info($"FireworksExplosionPool: Switched to texture type '{textureTypeName}'");
+
+                // Persist to config
+                if (Plugin.Settings != null)
+                    Plugin.Settings.BombFireworksTextureType = textureTypeName;
+            }
+            else
+            {
+                Plugin.Log.Warn($"FireworksExplosionPool: Texture type '{textureTypeName}' not found. Using default.");
+                _selectedTextureType = "Sparkle";
+            }
+        }
+
         public void SetParticleMaterial(Material mat)
         {
             if (_particleMaterial == null && mat != null)
@@ -32,7 +99,6 @@ namespace SaberSurgeon.Gameplay
 
         public void Spawn(Vector3 position, Color baseColor, int burstCount = 220, float life = 1.6f)
         {
-            // ← CHANGE: Call this instead of checking if null
             var mat = GetOrInitializeParticleMaterial();
             if (mat == null)
             {
@@ -44,7 +110,6 @@ namespace SaberSurgeon.Gameplay
             root.transform.position = position;
             root.SetActive(true);
 
-            // Randomize a little so it feels like fireworks (optional).
             var color = Color.HSVToRGB(Random.value, 0.85f, 1.0f);
             color.a = 1f;
             color = Color.Lerp(color, baseColor, 0.35f);
@@ -58,11 +123,8 @@ namespace SaberSurgeon.Gameplay
             burst.Play(true);
             sparks.Play(true);
 
-            // Return to pool after it's done.
             StartCoroutine(DespawnAfter(root, Mathf.Max(life, 0.1f) + 0.25f));
         }
-
-
 
         private GameObject GetOrCreateInstance()
         {
@@ -84,19 +146,15 @@ namespace SaberSurgeon.Gameplay
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
-
             var ps = go.AddComponent<ParticleSystem>();
             var psr = go.GetComponent<ParticleSystemRenderer>();
             psr.sharedMaterial = mat;
 
-            // Basic defaults; real shaping is done per-spawn in Configure*.
             var main = ps.main;
             main.loop = false;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
-
             var emission = ps.emission;
             emission.rateOverTime = 0f;
-
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
@@ -126,7 +184,6 @@ namespace SaberSurgeon.Gameplay
                 new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
             );
             col.color = new ParticleSystem.MinMaxGradient(grad);
-
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
@@ -147,7 +204,6 @@ namespace SaberSurgeon.Gameplay
 
             var emission = ps.emission;
             emission.SetBursts(new[] { new ParticleSystem.Burst(0.02f, (short)Mathf.Clamp(count, 1, 4000)) });
-
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
@@ -157,53 +213,21 @@ namespace SaberSurgeon.Gameplay
             go.SetActive(false);
             _pool.Enqueue(go);
         }
-        private void LogAllParticleTextures()
-        {
-            var textures = Resources.FindObjectsOfTypeAll<Texture2D>();
-            var particleTextures = textures.Where(t =>
-                t.name.Contains("Particle") ||
-                t.name.Contains("particle") ||
-                t.name.Contains("Star") ||
-                t.name.Contains("Heart") ||
-                t.name.Contains("Spark")
-            ).ToList();
-
-            Plugin.Log.Info($"Found {particleTextures.Count} particle-related textures:");
-            foreach (var tex in particleTextures)
-            {
-                Plugin.Log.Info($"  - {tex.name} ({tex.width}x{tex.height})");
-            }
-        }
 
         private Material GetOrInitializeParticleMaterial()
         {
             if (_particleMaterial != null) return _particleMaterial;
 
-            // Find the default particle material from Beat Saber
             var particle = Resources.FindObjectsOfTypeAll<ParticleSystemRenderer>()
                 .FirstOrDefault(ps => ps.sharedMaterial != null && ps.sharedMaterial.name.Contains("Particle"));
 
             if (particle != null)
             {
                 _particleMaterial = particle.sharedMaterial;
-
-                LogAllParticleTextures();
-
-                // DEBUG: Log what texture is being used
-                if (_particleMaterial.mainTexture != null)
-                {
-                    Plugin.Log.Info($"FireworksExplosionPool: Particle material texture = '{_particleMaterial.mainTexture.name}'");
-                }
-                else
-                {
-                    Plugin.Log.Warn("FireworksExplosionPool: Particle material has NO texture!");
-                }
-
                 Plugin.Log.Info("FireworksExplosionPool: Initialized material from game ParticleSystemRenderer");
             }
             else
             {
-                // Fallback: create a simple material from standard shader
                 var shader = Shader.Find("Standard");
                 if (shader != null)
                 {
@@ -217,8 +241,19 @@ namespace SaberSurgeon.Gameplay
                 }
             }
 
+            // ← CRITICAL: Apply the selected texture to the material
+            if (_particleMaterial != null && _particleTextures.ContainsKey(_selectedTextureType))
+            {
+                var tex = _particleTextures[_selectedTextureType];
+                _particleMaterial.mainTexture = tex;
+                Plugin.Log.Info($"FireworksExplosionPool: Applied texture '{_selectedTextureType}' to material");
+            }
+            else if (_particleMaterial != null)
+            {
+                Plugin.Log.Warn($"FireworksExplosionPool: Could not apply texture '{_selectedTextureType}' (not loaded)");
+            }
+
             return _particleMaterial;
         }
-
     }
 }

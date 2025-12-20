@@ -63,6 +63,9 @@ namespace SaberSurgeon
             SaberSurgeon.Gameplay.FontBundleLoader.CopyBundleFromPluginFolderIfMissing();
             _ = SaberSurgeon.Gameplay.FontBundleLoader.EnsureLoadedAsync();
 
+
+            
+
             BSEvents.menuSceneActive += OnMenuSceneActive;
 
             // Bind AudioTimeSyncController (unchanged)

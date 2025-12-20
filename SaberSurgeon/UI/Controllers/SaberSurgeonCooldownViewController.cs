@@ -302,6 +302,39 @@ namespace SaberSurgeon.UI.Controllers
             }
         }
 
+        [UIValue("bomb_fireworks_texture_options")]
+        public List<object> BombFireworksTextureOptions
+        {
+            get
+            {
+                var options = FireworksExplosionPool.GetAvailableTextureTypes();
+                if (options == null || options.Count == 0)
+                    return new List<object> { "Sparkle" }; // Fallback
+                return options.Cast<object>().ToList();
+            }
+        }
+
+        [UIValue("bomb_fireworks_texture")]
+        public string BombFireworksTexture
+        {
+            get => Plugin.Settings?.BombFireworksTextureType ?? "Sparkle";
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    return;
+
+                FireworksExplosionPool.SetTextureType(value);
+
+                if (Plugin.Settings != null)
+                    Plugin.Settings.BombFireworksTextureType = value;
+
+                NotifyPropertyChanged(nameof(BombFireworksTexture));
+            }
+        }
+
+
+
+
 
         private IEnumerator RefreshBombFontDropdown()
         {

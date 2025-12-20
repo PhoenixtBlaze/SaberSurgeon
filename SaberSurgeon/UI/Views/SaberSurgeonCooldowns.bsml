@@ -273,11 +273,23 @@
 			</horizontal>
 		</vertical>
 		</settings-scroll-view>
-		<horizontal child-force-expand-width="false" pad-right="65">
+		<horizontal child-force-expand-width="false" pad-bottom="20" pad-right="65">
 			<text id="bomb-font-preview"
 					text="PreviewUsername"
 					align="Center"
 					font-size="5" />
+		</horizontal>
+		<horizontal pad-right="70" pad-top="5">
+			<text text="Explosion Particle" align="Center" />
+		</horizontal>
+		<horizontal pad-right="70" pad-top="20">
+			<dropdown-list-setting
+				id="bomb-fireworks-dropdown"
+				text=""
+				value="bomb_fireworks_texture"
+				choices="bomb_fireworks_texture_options"
+				apply-on-change="true"
+				hover-hint="Choose the particle texture for bomb explosions" />
 		</horizontal>
 		<horizontal child-force-expand-width="false" pad-top="50" pad-right="85">
 			<button text="Close" pref-width="20" on-click="CloseBombVisuals" />
