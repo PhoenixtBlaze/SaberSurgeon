@@ -1,4 +1,5 @@
 ﻿using IPA.Config.Stores;
+using UnityEngine;
 
 namespace SaberSurgeon
 {
@@ -19,8 +20,10 @@ namespace SaberSurgeon
         public virtual bool BombEnabled { get; set; } = true;
         public virtual float BombTextHeight { get; set; } = 1.0f;     // vertical scale
         public virtual float BombTextWidth { get; set; } = 1.0f;      // horizontal scale
-        public virtual float BombSpawnDistance { get; set; } = 10.0f; // units forward from player
+        public virtual float BombSpawnDistance { get; set; } = 20.0f; // units forward from player
         public virtual string BombFontType { get; set; } = "Default"; // dropdown selection
+        public virtual Color BombGradientStart { get; set; } = Color.blue;
+        public virtual Color BombGradientEnd { get; set; } = Color.red;
         public virtual bool FasterEnabled { get; set; } = false;
         public virtual bool SuperFastEnabled { get; set; } = false;
         public virtual bool SlowerEnabled { get; set; } = true;

@@ -52,6 +52,11 @@
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\AdditionalContentModel.Interfaces.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
     </Reference>
+    <Reference Include="AssetBundleLoadingTools, Version=1.1.10.0, Culture=neutral, processorArchitecture=MSIL">
+      <Private>False</Private>
+      <HintPath>$(BeatSaberDir)\Plugins\AssetBundleLoadingTools.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
     <Reference Include="BeatmapCore, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <Private>False</Private>
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatmapCore.dll</HintPath>
@@ -297,6 +302,7 @@
     <Compile Include="Gameplay\DisappearingArrowsVisualController.cs" />
     <Compile Include="Gameplay\FasterSongManager.cs" />
     <Compile Include="Gameplay\FlashbangManager.cs" />
+    <Compile Include="Gameplay\FontBundleLoader.cs" />
     <Compile Include="Gameplay\GameplayManager.cs" />
     <Compile Include="Gameplay\GhostNotesManager.cs" />
     <Compile Include="Gameplay\GhostVisualController.cs" />

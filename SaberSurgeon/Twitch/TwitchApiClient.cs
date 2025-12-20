@@ -1,12 +1,15 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using SaberSurgeon.UI.Controllers;
+using System;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 
 namespace SaberSurgeon.Twitch
 {
     public class TwitchApiClient
     {
+        public static event Action OnSubscriberStatusChanged;
+
         private static TwitchApiClient _instance;
         public static TwitchApiClient Instance
         {
@@ -115,6 +118,11 @@ namespace SaberSurgeon.Twitch
 
 
                 }
+                // Invoke the static event so any listening ViewControllers can update
+                OnSubscriberStatusChanged?.Invoke();
+                Plugin.Log.Info("TwitchAPI: Subscriber status changed event fired ");
+
+
             }
             else
             {

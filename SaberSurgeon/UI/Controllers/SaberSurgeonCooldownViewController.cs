@@ -3,6 +3,7 @@ using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
 using HMUI; // for ModalView
 using SaberSurgeon.Chat;
+using SaberSurgeon.Gameplay;
 using SaberSurgeon.Twitch;
 using System;
 using System.Collections.Generic;
@@ -238,23 +239,52 @@ namespace SaberSurgeon.UI.Controllers
         }
 
 
-        // Dropdown options for bomb font
-        [UIValue("bomb_font_options")]
-        private List<object> BombFontOptions { get; } = new object[]
-        {
-        "Default"
-        }.ToList();
+        // *** Font Selection Logic ***
 
-        // Currently selected font
+        [UIValue("bomb_font_options")]
+        public List<object> BombFontOptions
+        {
+            get
+            {
+                // Pull dynamic options from FontBundleLoader
+                // BSML expects List<object> for dropdown choices
+                var options = FontBundleLoader.GetBombFontOptions();
+                return options.Cast<object>().ToList();
+            }
+        }
+
         [UIValue("bomb_font_selected")]
         public string BombFontSelected
         {
-            get => Plugin.Settings?.BombFontType ?? "Default";
+            get => FontBundleLoader.GetSelectedBombFontOption();
             set
             {
-                if (Plugin.Settings != null)
-                    Plugin.Settings.BombFontType = value;
+                FontBundleLoader.SetSelectedBombFontOption(value);
                 NotifyPropertyChanged(nameof(BombFontSelected));
+            }
+        }
+
+        // *** Gradient Color Logic ***
+
+        [UIValue("bomb_gradient_start")]
+        public Color BombGradientStart
+        {
+            get => Plugin.Settings?.BombGradientStart ?? Color.yellow;
+            set
+            {
+                if (Plugin.Settings != null) Plugin.Settings.BombGradientStart = value;
+                NotifyPropertyChanged(nameof(BombGradientStart));
+            }
+        }
+
+        [UIValue("bomb_gradient_end")]
+        public Color BombGradientEnd
+        {
+            get => Plugin.Settings?.BombGradientEnd ?? Color.red;
+            set
+            {
+                if (Plugin.Settings != null) Plugin.Settings.BombGradientEnd = value;
+                NotifyPropertyChanged(nameof(BombGradientEnd));
             }
         }
 

@@ -3,6 +3,7 @@ using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
 using SaberSurgeon.Chat;
 using SaberSurgeon.Twitch;
+using System;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -839,6 +840,82 @@ namespace SaberSurgeon.UI.Controllers
                 NotifyPropertyChanged(nameof(RequeueLimit));
             }
         }
+
+        // Footer text properties
+        [UIValue("subscribeButtonText")]
+        public string SubscribeButtonText
+        {
+            get
+            {
+                // Check if user is subscribed
+                int supporterTier = Plugin.Settings?.CachedSupporterTier ?? 0;
+
+                if (supporterTier > 0)
+                {
+                    // Subscriber - show unlocked message in green
+                    return "<color=#00FF00>✓ Subscriber Features Unlocked</color>";
+                }
+                else
+                {
+                    // Non-subscriber - show subscribe prompt in blue
+                    return "<color=#0099FF>Subscribe to Support</color>";
+                }
+            }
+        }
+
+        // Called when Documentation button clicked
+        [UIAction("OnDocumentationClicked")]
+        private void OnDocumentationClicked()
+        {
+            Plugin.Log.Info("Opening GitHub documentation...");
+            try
+            {
+                // Open GitHub repo in default browser
+                System.Diagnostics.Process.Start("https://github.com/PhoenixtBlaze/SaberSurgeon");
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error($"Failed to open documentation link: {ex.Message}");
+            }
+        }
+
+        // Called when Subscribe button clicked
+        [UIAction("OnSubscribeClicked")]
+        private void OnSubscribeClicked()
+        {
+            int supporterTier = Plugin.Settings?.CachedSupporterTier ?? 0;
+
+            if (supporterTier > 0)
+            {
+                Plugin.Log.Info("User is already subscribed!");
+                return;
+            }
+
+            Plugin.Log.Info("Opening Twitch channel for subscription...");
+            try
+            {
+                // Open your Twitch channel in default browser
+                System.Diagnostics.Process.Start("https://www.twitch.tv/phoenixblaze0");
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error($"Failed to open Twitch link: {ex.Message}");
+            }
+        }
+
+        // Update subscription button when status changes
+        private void RefreshSubscriptionStatus()
+        {
+            // This will force the UI to re-evaluate SubscribeButtonText
+            NotifyPropertyChanged(nameof(SubscribeButtonText));
+        }
+
+        //Call this when Twitch authentication succeeds or tier changes
+        public void OnTwitchStatusUpdated()
+        {
+            RefreshSubscriptionStatus();
+        }
+
     }
 
 }

@@ -208,7 +208,8 @@ namespace SaberSurgeon.HarmonyPatches
                 if (mr != null)
                 {
                     mr.enabled = true;
-                    var mat = new Material(Shader.Find("Standard"));
+                    var safeShader = Shader.Find("Custom/SimpleLit") ?? Shader.Find("Standard");
+                    var mat = new Material(safeShader);
                     mat.color = noteColor;
                     mr.material = mat;
                     mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
@@ -365,6 +366,7 @@ namespace SaberSurgeon.HarmonyPatches
 
             try
             {
+
                 // Use game's flying text if available, otherwise create simple text
                 if (_flyingTextPrefab != null)
                 {
@@ -388,8 +390,14 @@ namespace SaberSurgeon.HarmonyPatches
 
             var curvedText = textGo.AddComponent<CurvedTextMeshPro>();
 
-            if (_flyingTextPrefab.font != null)
+            var customFont = SaberSurgeon.Gameplay.FontBundleLoader.BombUsernameFont;
+
+            if (customFont != null)
+                curvedText.font = customFont;
+            else if (_flyingTextPrefab.font != null)
                 curvedText.font = _flyingTextPrefab.font;
+
+            Plugin.Log.Info($"BombText font = {(customFont != null ? customFont.name : "NULL (fallback)")}");
 
             curvedText.text = username;
             curvedText.fontSize = 4f;
@@ -398,6 +406,7 @@ namespace SaberSurgeon.HarmonyPatches
             curvedText.outlineWidth = 0.2f;
             curvedText.outlineColor = Color.black;
 
+            ApplyBloomToTextMaterial(curvedText);
             // Apply width/height scaling
             float height = Plugin.Settings?.BombTextHeight ?? 1.0f;
             float width = Plugin.Settings?.BombTextWidth ?? 1.0f;
@@ -418,11 +427,14 @@ namespace SaberSurgeon.HarmonyPatches
             textGo.transform.position = cutPoint + Vector3.up * 0.5f;
 
             var tmp = textGo.AddComponent<TextMeshPro>();
+            var customFont = SaberSurgeon.Gameplay.FontBundleLoader.BombUsernameFont;
+            if (customFont != null)
+                tmp.font = customFont;
 
             // Try to find game's font
             var fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
             var tekoFont = fonts.FirstOrDefault(f => f.name.Contains("Teko"));
-            if (tekoFont != null)
+            if (customFont == null && tekoFont != null)
                 tmp.font = tekoFont;
 
             tmp.text = username;
@@ -440,6 +452,31 @@ namespace SaberSurgeon.HarmonyPatches
         }
 
 
+        private static void ApplyBloomToTextMaterial(TMP_Text textComponent)
+        {
+            if (textComponent == null || textComponent.material == null) return;
+
+            Material mat = new Material(textComponent.material);
+
+            // Use the game's existing TMP shader (already safe for VR)
+            Shader tmpShader = Resources.FindObjectsOfTypeAll<Shader>()
+                .FirstOrDefault(s => s.name.Contains("TextMeshPro/Distance Field"));
+
+            if (tmpShader != null)
+                mat.shader = tmpShader;
+
+            //ENABLE BLOOM by setting emissive/glow properties
+            mat.EnableKeyword("_EMISSION");
+
+            // TextMeshPro-specific bloom properties
+            mat.SetFloat("_GlowPower", 0.5f);      // Bloom intensity
+            mat.SetFloat("_Glow", 1.0f);           // Enable glow
+            mat.SetFloat("_ScaleRatioA", 1.0f);
+            mat.SetFloat("_ScaleRatioB", 1.0f);
+
+            // Apply the modified material
+            textComponent.material = mat;
+        }
 
 
         private static IEnumerator AnimateFlyingText(GameObject textGo, Vector3 startPos)
@@ -454,8 +491,9 @@ namespace SaberSurgeon.HarmonyPatches
             Vector3 forward = Camera.main != null ? Camera.main.transform.forward : Vector3.forward;
             Vector3 targetPos = startPos + forward * spawnDistance + Vector3.up * 2f;
 
-            var tmp = textGo.GetComponent<TextMeshPro>();
-            Color startColor = tmp != null ? tmp.color : Color.yellow;
+            TMP_Text tmp = textGo.GetComponent<TMP_Text>();
+            Color startColor = Plugin.Settings?.BombGradientStart ?? Color.yellow;
+            Color endColor = Plugin.Settings?.BombGradientEnd ?? Color.red;
 
             while (elapsed < duration)
             {
@@ -468,8 +506,8 @@ namespace SaberSurgeon.HarmonyPatches
                 // Fade out
                 if (tmp != null)
                 {
-                    Color c = startColor;
-                    c.a = Mathf.Lerp(1f, 0f, t);
+                    Color c = Color.Lerp(startColor, endColor, t);   // color over time
+                    c.a = Mathf.Lerp(1f, 0f, t);                    // fade out (existing behavior)
                     tmp.color = c;
                 }
 
