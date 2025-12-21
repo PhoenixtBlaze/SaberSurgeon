@@ -302,6 +302,8 @@ namespace SaberSurgeon.UI.Controllers
             }
         }
 
+        /*
+
         [UIValue("bomb_fireworks_texture_options")]
         public List<object> BombFireworksTextureOptions
         {
@@ -332,7 +334,7 @@ namespace SaberSurgeon.UI.Controllers
             }
         }
 
-
+        */
 
 
 

@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEngine;
 
@@ -9,14 +11,11 @@ namespace SaberSurgeon.Gameplay
         private static FireworksExplosionPool _instance;
         private static GameObject _go;
 
-        private Material _particleMaterial;
+        private GameObject _explosionPrefab;
         private readonly Queue<GameObject> _pool = new Queue<GameObject>();
 
-        // ← NEW: Dictionary of available textures
-        private static Dictionary<string, Texture2D> _particleTextures = new Dictionary<string, Texture2D>();
-
-        // ← NEW: Currently selected texture
-        private static string _selectedTextureType = "Default"; // Default to Sparkle
+        // Cache a known-good material from the game itself
+        private static Material _gameSafeMaterial;
 
         public static FireworksExplosionPool Instance
         {
@@ -30,187 +29,133 @@ namespace SaberSurgeon.Gameplay
             }
         }
 
-        // ← NEW: Load all particle textures from Beat Saber
-        public static void LoadAvailableTextures()
+        private void Awake()
         {
-            _particleTextures.Clear();
+            // 1. Find a safe material from the game (Dust, Sparkle, etc.)
+            // This guarantees VR Single Pass Instanced support.
+            var existingParticle = Resources.FindObjectsOfTypeAll<ParticleSystemRenderer>()
+                .FirstOrDefault(r => r.sharedMaterial != null && r.sharedMaterial.shader.name.Contains("Particle"));
 
-            var allTextures = Resources.FindObjectsOfTypeAll<Texture2D>();
-
-            // These are the ones found in your logs
-            string[] targetNames = { "Sparkle", "Spark", "SmokeParticle", "Default-Particle" };
-
-            foreach (var targetName in targetNames)
+            if (existingParticle != null)
             {
-                var tex = allTextures.FirstOrDefault(t => t.name == targetName);
-                if (tex != null)
-                {
-                    if (!_particleTextures.ContainsKey(targetName))
-                    {
-                        _particleTextures[targetName] = tex;
-                        Plugin.Log.Info($"FireworksExplosionPool: Loaded texture '{targetName}' ({tex.width}x{tex.height})");
-                    }
-                }
-            }
-
-            if (_particleTextures.Count == 0)
-                Plugin.Log.Warn("FireworksExplosionPool: No particle textures loaded!");
-            else
-                Plugin.Log.Info($"FireworksExplosionPool: Loaded {_particleTextures.Count} particle textures: {string.Join(", ", _particleTextures.Keys)}");
-
-            // Load user's saved preference
-            string savedTexture = Plugin.Settings?.BombFireworksTextureType ?? "Sparkle";
-            SetTextureType(savedTexture);
-        }
-
-        // ← NEW: Get list of available texture options for UI dropdown
-        public static List<string> GetAvailableTextureTypes()
-        {
-            return _particleTextures.Keys.ToList();
-        }
-
-        // ← NEW: Set which texture type to use
-        public static void SetTextureType(string textureTypeName)
-        {
-            if (string.IsNullOrWhiteSpace(textureTypeName))
-                textureTypeName = "Sparkle";
-
-            if (_particleTextures.ContainsKey(textureTypeName))
-            {
-                _selectedTextureType = textureTypeName;
-                Plugin.Log.Info($"FireworksExplosionPool: Switched to texture type '{textureTypeName}'");
-
-                // Persist to config
-                if (Plugin.Settings != null)
-                    Plugin.Settings.BombFireworksTextureType = textureTypeName;
+                // Create a clone of this safe material
+                _gameSafeMaterial = new Material(existingParticle.sharedMaterial);
+                // Ensure it uses Additive blending for glow
+                _gameSafeMaterial.SetFloat("_Mode", 2); // Additive usually
+                _gameSafeMaterial.SetColor("_TintColor", Color.white);
+                Plugin.Log.Info($"FireworksExplosionPool: Cloned safe game material: {_gameSafeMaterial.name}");
             }
             else
             {
-                Plugin.Log.Warn($"FireworksExplosionPool: Texture type '{textureTypeName}' not found. Using default.");
-                _selectedTextureType = "Sparkle";
+                // Fallback if game hasn't loaded particles yet (unlikely during song)
+                Plugin.Log.Warn("FireworksExplosionPool: Could not find game particle material. Trying standard shader.");
+                var shader = Shader.Find("Particles/Standard Unlit");
+                if (shader) _gameSafeMaterial = new Material(shader);
             }
+
+            LoadAssetBundle();
         }
 
-        public void SetParticleMaterial(Material mat)
+        private void LoadAssetBundle()
         {
-            if (_particleMaterial == null && mat != null)
-                _particleMaterial = mat;
+            if (_explosionPrefab != null) return;
+
+            string bundlePath = Path.Combine(Environment.CurrentDirectory, "UserData", "SaberSurgeon", "Effects", "surgeoneffects");
+            if (!File.Exists(bundlePath)) return;
+
+            try
+            {
+                var bundle = AssetBundle.LoadFromFile(bundlePath);
+                if (bundle == null) return;
+
+                _explosionPrefab = bundle.LoadAsset<GameObject>("SurgeonExplosion");
+                bundle.Unload(false);
+            }
+            catch (System.Exception ex)
+            {
+                Plugin.Log.Error($"FireworksExplosionPool: Bundle error: {ex.Message}");
+            }
         }
 
         public void Spawn(Vector3 position, Color baseColor, int burstCount = 220, float life = 1.6f)
         {
-            var mat = GetOrInitializeParticleMaterial();
-            if (mat == null)
+            if (_explosionPrefab == null)
             {
-                Plugin.Log.Warn("FireworksExplosionPool: Cannot spawn – material is null");
-                return;
+                LoadAssetBundle();
+                if (_explosionPrefab == null) return;
             }
 
-            var root = GetOrCreateInstance();
-            root.transform.position = position;
-            root.SetActive(true);
+            GameObject explosion = GetOrCreateInstance();
+            explosion.transform.position = position;
 
-            var color = Color.HSVToRGB(Random.value, 0.85f, 1.0f);
-            color.a = 1f;
-            color = Color.Lerp(color, baseColor, 0.35f);
+            // FIX 1: Force Layer 0 (Default) for VR rendering
+            SetLayerRecursively(explosion, 0);
 
-            var burst = root.transform.Find("Burst").GetComponent<ParticleSystem>();
-            var sparks = root.transform.Find("Sparks").GetComponent<ParticleSystem>();
+            // Create Rainbow Gradient
+            Gradient rainbowGradient = new Gradient();
+            rainbowGradient.SetKeys(
+                new GradientColorKey[] {
+                    new GradientColorKey(Color.red, 0.0f),
+                    new GradientColorKey(Color.yellow, 0.15f),
+                    new GradientColorKey(Color.green, 0.3f),
+                    new GradientColorKey(Color.cyan, 0.5f),
+                    new GradientColorKey(Color.blue, 0.65f),
+                    new GradientColorKey(Color.magenta, 0.8f),
+                    new GradientColorKey(Color.red, 1.0f)
+                },
+                new GradientAlphaKey[] { new GradientAlphaKey(1.0f, 0.0f), new GradientAlphaKey(0.0f, 1.0f) }
+            );
 
-            ConfigureBurst(burst, color, burstCount, life);
-            ConfigureSparks(sparks, color, Mathf.RoundToInt(burstCount * 0.9f), life * 0.9f);
+            // FIX 2: Apply Material and Colors
+            var renderers = explosion.GetComponentsInChildren<ParticleSystemRenderer>();
+            foreach (var r in renderers)
+            {
+                // Swap to the safe game material (fixes Left Eye)
+                // We keep the main texture from your prefab if possible, or use the game's default
+                if (_gameSafeMaterial != null)
+                {
+                    var texture = r.sharedMaterial?.mainTexture; // Save your star texture
+                    r.material = _gameSafeMaterial; // Apply safe shader
+                    if (texture != null) r.material.mainTexture = texture; // Restore star texture
+                }
+            }
 
-            burst.Play(true);
-            sparks.Play(true);
+            var systems = explosion.GetComponentsInChildren<ParticleSystem>();
+            foreach (var ps in systems)
+            {
+                var main = ps.main;
 
-            StartCoroutine(DespawnAfter(root, Mathf.Max(life, 0.1f) + 0.25f));
+                // Force base color to white so rainbow tint works
+                // Use MinMaxGradient to apply rainbow
+                main.startColor = new ParticleSystem.MinMaxGradient(rainbowGradient);
+
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                ps.Play(true);
+            }
+
+            explosion.SetActive(true);
+            StartCoroutine(DespawnAfter(explosion, 2.5f));
+        }
+
+        private void SetLayerRecursively(GameObject obj, int newLayer)
+        {
+            obj.layer = newLayer;
+            foreach (Transform child in obj.transform)
+            {
+                SetLayerRecursively(child.gameObject, newLayer);
+            }
         }
 
         private GameObject GetOrCreateInstance()
         {
-            // FIX: Loop until we find a valid object or empty the queue
             while (_pool.Count > 0)
             {
                 var pooled = _pool.Dequeue();
-                // Check if the Unity object is still valid (not destroyed)
-                if (pooled != null)
-                {
-                    return pooled;
-                }
+                if (pooled != null) return pooled;
             }
-
-            var mat = GetOrInitializeParticleMaterial();
-            var root = new GameObject("SaberSurgeonFireworksExplosion");
-            root.SetActive(false);
-            CreateParticleChild(root.transform, "Burst", mat);
-            CreateParticleChild(root.transform, "Sparks", mat);
-            return root;
-        }
-
-
-        private static void CreateParticleChild(Transform parent, string name, Material mat)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            var ps = go.AddComponent<ParticleSystem>();
-            var psr = go.GetComponent<ParticleSystemRenderer>();
-            psr.sharedMaterial = mat;
-
-            var main = ps.main;
-            main.loop = false;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            var emission = ps.emission;
-            emission.rateOverTime = 0f;
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        }
-
-        private static void ConfigureBurst(ParticleSystem ps, Color color, int count, float life)
-        {
-            var main = ps.main;
-            main.startColor = color;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(life * 0.55f, life);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(6f, 14f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.12f);
-            main.gravityModifier = 0.35f;
-            main.maxParticles = 4000;
-
-            var shape = ps.shape;
-            shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Sphere;
-            shape.radius = 0.03f;
-
-            var emission = ps.emission;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)Mathf.Clamp(count, 1, 2000)) });
-
-            var col = ps.colorOverLifetime;
-            col.enabled = true;
-            var grad = new Gradient();
-            grad.SetKeys(
-                new[] { new GradientColorKey(color, 0f), new GradientColorKey(color, 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
-            );
-            col.color = new ParticleSystem.MinMaxGradient(grad);
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        }
-
-        private static void ConfigureSparks(ParticleSystem ps, Color color, int count, float life)
-        {
-            var main = ps.main;
-            main.startColor = Color.Lerp(color, Color.white, 0.35f);
-            main.startLifetime = new ParticleSystem.MinMaxCurve(life * 0.35f, life * 0.8f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(2.5f, 7f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.02f, 0.06f);
-            main.gravityModifier = 0.9f;
-            main.maxParticles = 6000;
-
-            var shape = ps.shape;
-            shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Sphere;
-            shape.radius = 0.08f;
-
-            var emission = ps.emission;
-            emission.SetBursts(new[] { new ParticleSystem.Burst(0.02f, (short)Mathf.Clamp(count, 1, 4000)) });
-            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var newObj = Instantiate(_explosionPrefab);
+            DontDestroyOnLoad(newObj);
+            return newObj;
         }
 
         private System.Collections.IEnumerator DespawnAfter(GameObject go, float seconds)
@@ -220,46 +165,9 @@ namespace SaberSurgeon.Gameplay
             _pool.Enqueue(go);
         }
 
-        private Material GetOrInitializeParticleMaterial()
-        {
-            if (_particleMaterial != null) return _particleMaterial;
-
-            var particle = Resources.FindObjectsOfTypeAll<ParticleSystemRenderer>()
-                .FirstOrDefault(ps => ps.sharedMaterial != null && ps.sharedMaterial.name.Contains("Particle"));
-
-            if (particle != null)
-            {
-                _particleMaterial = particle.sharedMaterial;
-                Plugin.Log.Info("FireworksExplosionPool: Initialized material from game ParticleSystemRenderer");
-            }
-            else
-            {
-                var shader = Shader.Find("Standard");
-                if (shader != null)
-                {
-                    _particleMaterial = new Material(shader);
-                    _particleMaterial.name = "FireworksParticleMaterial";
-                    Plugin.Log.Info("FireworksExplosionPool: Created fallback material from Standard shader");
-                }
-                else
-                {
-                    Plugin.Log.Warn("FireworksExplosionPool: Failed to create particle material (no shader found)");
-                }
-            }
-
-            // ← CRITICAL: Apply the selected texture to the material
-            if (_particleMaterial != null && _particleTextures.ContainsKey(_selectedTextureType))
-            {
-                var tex = _particleTextures[_selectedTextureType];
-                _particleMaterial.mainTexture = tex;
-                Plugin.Log.Info($"FireworksExplosionPool: Applied texture '{_selectedTextureType}' to material");
-            }
-            else if (_particleMaterial != null)
-            {
-                Plugin.Log.Warn($"FireworksExplosionPool: Could not apply texture '{_selectedTextureType}' (not loaded)");
-            }
-
-            return _particleMaterial;
-        }
+        // Stubs
+        public static void LoadAvailableTextures() { }
+        public static List<string> GetAvailableTextureTypes() { return new List<string> { "Default" }; }
+        public static void SetTextureType(string t) { }
     }
 }

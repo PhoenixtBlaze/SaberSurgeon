@@ -279,6 +279,8 @@
 					align="Center"
 					font-size="5" />
 		</horizontal>
+		
+		<!--
 		<horizontal pad-right="70" pad-top="5">
 			<text text="Explosion Particle" align="Center" />
 		</horizontal>
@@ -291,6 +293,7 @@
 				apply-on-change="true"
 				hover-hint="Choose the particle texture for bomb explosions" />
 		</horizontal>
+		-->
 		<horizontal child-force-expand-width="false" pad-top="50" pad-right="85">
 			<button text="Close" pref-width="20" on-click="CloseBombVisuals" />
 		</horizontal>
