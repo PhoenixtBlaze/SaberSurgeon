@@ -10,6 +10,9 @@ namespace SaberSurgeon.Chat
     public class CommandHandler
     {
         private static CommandHandler _instance;
+
+        private readonly object _lock = new object();
+
         public static CommandHandler Instance => _instance ?? (_instance = new CommandHandler());
 
         private readonly Dictionary<string, CommandDelegate> _commands;
@@ -122,62 +125,66 @@ namespace SaberSurgeon.Chat
 
         public void Initialize()
         {
-            if (_isInitialized)
+            lock (_lock)
             {
-                Plugin.Log.Warn("CommandHandler: Already initialized!");
-                return;
-            }
 
-            try
-            {
-                Plugin.Log.Info("CommandHandler: Initializing...");
-                RegisterCommands();
+                if (_isInitialized)
+                {
+                    Plugin.Log.Warn("CommandHandler: Already initialized!");
+                    return;
+                }
 
-                var cfg = Plugin.Settings ?? new PluginConfig();
+                try
+                {
+                    Plugin.Log.Info("CommandHandler: Initializing...");
+                    RegisterCommands();
 
-                BombCommandName = cfg.BombCommandName;
+                    var cfg = Plugin.Settings ?? new PluginConfig();
 
-                SongRequestsEnabled = cfg.SongRequestsEnabled;
-                RequestAllowSpecificDifficulty = cfg.RequestAllowSpecificDifficulty;
-                RequestAllowSpecificTime = cfg.RequestAllowSpecificTime;
+                    BombCommandName = cfg.BombCommandName;
 
-                // Global switches
-                GlobalCooldownEnabled = cfg.GlobalCooldownEnabled;
-                PerCommandCooldownsEnabled = cfg.PerCommandCooldownsEnabled;
-                GlobalCooldownSeconds = cfg.GlobalCooldownSeconds;
+                    SongRequestsEnabled = cfg.SongRequestsEnabled;
+                    RequestAllowSpecificDifficulty = cfg.RequestAllowSpecificDifficulty;
+                    RequestAllowSpecificTime = cfg.RequestAllowSpecificTime;
 
-                // Toggles
-                RainbowEnabled = cfg.RainbowEnabled;
-                DisappearEnabled = cfg.DisappearEnabled;
-                GhostEnabled = cfg.GhostEnabled;
-                BombEnabled = cfg.BombEnabled;
-                FasterEnabled = cfg.FasterEnabled;
-                SuperFastEnabled = cfg.SuperFastEnabled;
-                SlowerEnabled = cfg.SlowerEnabled;
-                FlashbangEnabled = cfg.FlashbangEnabled;
-                SpeedExclusiveEnabled = cfg.SpeedExclusiveEnabled;
+                    // Global switches
+                    GlobalCooldownEnabled = cfg.GlobalCooldownEnabled;
+                    PerCommandCooldownsEnabled = cfg.PerCommandCooldownsEnabled;
+                    GlobalCooldownSeconds = cfg.GlobalCooldownSeconds;
 
-                // Cooldowns
-                RainbowCooldownEnabled = cfg.RainbowCooldownSeconds > 0f; // if you want a flag
-                DisappearCooldownEnabled = cfg.DisappearCooldownSeconds > 0f;
-                GhostCooldownEnabled = cfg.GhostCooldownSeconds > 0f;
-                BombCooldownEnabled = cfg.BombCooldownSeconds > 0f;
+                    // Toggles
+                    RainbowEnabled = cfg.RainbowEnabled;
+                    DisappearEnabled = cfg.DisappearEnabled;
+                    GhostEnabled = cfg.GhostEnabled;
+                    BombEnabled = cfg.BombEnabled;
+                    FasterEnabled = cfg.FasterEnabled;
+                    SuperFastEnabled = cfg.SuperFastEnabled;
+                    SlowerEnabled = cfg.SlowerEnabled;
+                    FlashbangEnabled = cfg.FlashbangEnabled;
+                    SpeedExclusiveEnabled = cfg.SpeedExclusiveEnabled;
 
-                RainbowCooldownSeconds = cfg.RainbowCooldownSeconds;
-                DisappearCooldownSeconds = cfg.DisappearCooldownSeconds;
-                GhostCooldownSeconds = cfg.GhostCooldownSeconds;
-                BombCooldownSeconds = cfg.BombCooldownSeconds;
-                FasterCooldownSeconds = cfg.FasterCooldownSeconds;
-                SuperFastCooldownSeconds = cfg.SuperFastCooldownSeconds;
-                SlowerCooldownSeconds = cfg.SlowerCooldownSeconds;
-                FlashbangCooldownSeconds = cfg.FlashbangCooldownSeconds;
+                    // Cooldowns
+                    RainbowCooldownEnabled = cfg.RainbowCooldownSeconds > 0f; // if you want a flag
+                    DisappearCooldownEnabled = cfg.DisappearCooldownSeconds > 0f;
+                    GhostCooldownEnabled = cfg.GhostCooldownSeconds > 0f;
+                    BombCooldownEnabled = cfg.BombCooldownSeconds > 0f;
 
-                _isInitialized = true;
-                Plugin.Log.Info($"CommandHandler: Ready! ({_commands.Count} commands registered)");
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.Error($"CommandHandler: Exception during initialization: {ex}");
+                    RainbowCooldownSeconds = cfg.RainbowCooldownSeconds;
+                    DisappearCooldownSeconds = cfg.DisappearCooldownSeconds;
+                    GhostCooldownSeconds = cfg.GhostCooldownSeconds;
+                    BombCooldownSeconds = cfg.BombCooldownSeconds;
+                    FasterCooldownSeconds = cfg.FasterCooldownSeconds;
+                    SuperFastCooldownSeconds = cfg.SuperFastCooldownSeconds;
+                    SlowerCooldownSeconds = cfg.SlowerCooldownSeconds;
+                    FlashbangCooldownSeconds = cfg.FlashbangCooldownSeconds;
+
+                    _isInitialized = true;
+                    Plugin.Log.Info($"CommandHandler: Ready! ({_commands.Count} commands registered)");
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.Error($"CommandHandler: Exception during initialization: {ex}");
+                }
             }
         }
 
@@ -205,7 +212,10 @@ namespace SaberSurgeon.Chat
             if (string.IsNullOrEmpty(name) || handler == null)
                 return;
 
-            _commands[name.ToLower()] = handler;
+            lock (_lock) // Lock writing to _commands
+            {
+                _commands[name.ToLower()] = handler;
+            }
             Plugin.Log.Info($"CommandHandler: Registered !{name}");
         }
 
@@ -219,67 +229,88 @@ namespace SaberSurgeon.Chat
                 if (string.IsNullOrEmpty(messageText) || !messageText.StartsWith("!"))
                     return;
 
-                var parts = messageText.Substring(1)
-                    .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var parts = messageText.Substring(1).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0)
                     return;
 
                 var commandName = parts[0].ToLower();
 
-                // Map custom bomb alias to the internal "bomb" command
-                if (!string.Equals(BombCommandName, "bomb", StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(commandName, BombCommandName, StringComparison.OrdinalIgnoreCase))
+                // 1. Thread-safe alias check
+                // We capture local copies of settings to avoid threading issues if settings change
+                string bombCmdName = BombCommandName;
+                if (!string.Equals(bombCmdName, "bomb", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(commandName, bombCmdName, StringComparison.OrdinalIgnoreCase))
                 {
                     commandName = "bomb";
                 }
 
-                if (!_commands.ContainsKey(commandName))
+                // 2. Thread-safe Command Lookup
+                CommandDelegate handler = null;
+                lock (_lock)
                 {
-                    Plugin.Log.Debug($"CommandHandler: Unknown command: !{commandName}");
-                    return;
+                    if (!_commands.ContainsKey(commandName))
+                    {
+                        // Optional: Log debug only to avoid spam
+                        // Plugin.Log.Debug($"CommandHandler: Unknown command: !{commandName}");
+                        return;
+                    }
+                    handler = _commands[commandName];
                 }
 
-                // owner bypass
-                bool isadmin = string.Equals(
-                    context?.SenderName,
-                    "phoenixblaze0",
-                    StringComparison.OrdinalIgnoreCase);
-
+                // 3. Permission & Cooldown Checks
+                bool isadmin = string.Equals(context?.SenderName, "phoenixblaze0", StringComparison.OrdinalIgnoreCase);
                 bool skipCooldown = IsCommandExcludedFromCooldown(commandName);
 
-                // Cooldown check
-                if (!isadmin && IsCommandOnCooldown(commandName, out TimeSpan remainingTime))
+                bool onCooldown = false;
+                TimeSpan remainingTime = TimeSpan.Zero;
+
+                // Lock only the cooldown check
+                lock (_lock)
                 {
-                    Plugin.Log.Info(
-                        $"CommandHandler: !{commandName} on cooldown for {remainingTime.TotalSeconds:F0} more seconds");
-                    ChatManager.GetInstance().SendChatMessage(
-                        $"!Command !{commandName} is on cooldown. Try again in {remainingTime.TotalSeconds:F0} seconds.");
+                    onCooldown = IsCommandOnCooldown(commandName, out remainingTime);
+                }
+
+                if (!isadmin && onCooldown)
+                {
+                    Plugin.Log.Info($"CommandHandler: !{commandName} on cooldown for {remainingTime.TotalSeconds:F0}s");
+                    ChatManager.GetInstance().SendChatMessage($"!Command !{commandName} is on cooldown. Try again in {remainingTime.TotalSeconds:F0}s.");
                     return;
                 }
 
-                // Optional: log which backend this message came from
+                // Log execution
                 string sourceLabel = context?.Source.ToString() ?? "Unknown";
+                Plugin.Log.Info($"CommandHandler: Executing !{commandName} from {context.SenderName} (Source={sourceLabel})");
 
-                Plugin.Log.Info(
-                    $"CommandHandler: Executing !{commandName} from {context.SenderName} " +
-                    $"(Source={sourceLabel}, Mod={context.IsModerator}, VIP={context.IsVip}, " +
-                    $"Sub={context.IsSubscriber}, Bits={context.Bits})");
+                // 4. Execute Handler (OUTSIDE THE LOCK)
+                // This prevents the entire chat system from freezing if a command takes time
+                bool succeeded = false;
+                try
+                {
+                    if (handler != null)
+                    {
+                        succeeded = handler(context, messageText);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.Error($"CommandHandler: Error executing command !{commandName}: {ex}");
+                }
 
-                var handler = _commands[commandName];
-
-                // handler returns true only if effect actually triggered / command “succeeded”
-                bool succeeded = handler != null && handler(context, messageText);
-
+                // 5. Apply Cooldown (Thread-safe)
                 if (succeeded && !isadmin && !skipCooldown)
                 {
-                    SetCommandCooldown(commandName);
+                    lock (_lock)
+                    {
+                        SetCommandCooldown(commandName);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Plugin.Log.Error($"CommandHandler: Error processing command:  {ex.Message}");
+                Plugin.Log.Error($"CommandHandler: Critical error in ProcessCommand: {ex.Message}");
             }
         }
+
 
 
 
@@ -1004,6 +1035,7 @@ namespace SaberSurgeon.Chat
 
         private bool HandleSrCommand(object ctxObj, string fullCommand)
         {
+            /*
             if (!SongRequestsEnabled)
             {
                 SendResponse("SR command disabled via menu", "!!Song requests are disabled.");
@@ -1077,6 +1109,7 @@ namespace SaberSurgeon.Chat
             }
 
             SendResponse($"SR queued: {code} by {ctx.SenderName}", $"!!@{ctx.SenderName} queued: {code}");
+            */
             return true;
 
         }
@@ -1221,36 +1254,35 @@ namespace SaberSurgeon.Chat
                 return false;
             }
 
-            // Save current state and disable all
-            _commandStateBeforeDisable.Clear();
+            lock (_lock)
+            {
+                // FIX: Only save state if we aren't ALREADY disabled, otherwise we overwrite valid state with "false"
+                if (!GlobalDisableActive)
+                {
+                    _commandStateBeforeDisable.Clear();
+                    _commandStateBeforeDisable["rainbow"] = RainbowEnabled;
+                    _commandStateBeforeDisable["disappear"] = DisappearEnabled;
+                    _commandStateBeforeDisable["ghost"] = GhostEnabled;
+                    _commandStateBeforeDisable["bomb"] = BombEnabled;
+                    _commandStateBeforeDisable["faster"] = FasterEnabled;
+                    _commandStateBeforeDisable["superfast"] = SuperFastEnabled;
 
-            _commandStateBeforeDisable["rainbow"] = RainbowEnabled;
-            _commandStateBeforeDisable["disappear"] = DisappearEnabled;
-            _commandStateBeforeDisable["ghost"] = GhostEnabled;
-            _commandStateBeforeDisable["bomb"] = BombEnabled;
-            _commandStateBeforeDisable["faster"] = FasterEnabled;
-            _commandStateBeforeDisable["superfast"] = SuperFastEnabled;
-            _commandStateBeforeDisable["slower"] = SlowerEnabled;
-            _commandStateBeforeDisable["flashbang"] = FlashbangEnabled;
-            _commandStateBeforeDisable["notecolor"] = RainbowEnabled; // shares toggle with rainbow
+                    // Now disable
+                    RainbowEnabled = false;
+                    DisappearEnabled = false;
+                    GhostEnabled = false;
+                    BombEnabled = false;
+                    FasterEnabled = false;
+                    SuperFastEnabled = false;
 
-            // Disable all
-            RainbowEnabled = false;
-            DisappearEnabled = false;
-            GhostEnabled = false;
-            BombEnabled = false;
-            FasterEnabled = false;
-            SuperFastEnabled = false;
-            SlowerEnabled = false;
-            FlashbangEnabled = false;
-
-            GlobalDisableActive = true;
-
-            SendResponse(
-                $"Global disable",
-                $"!!Surgeon Disabled");
-
-            Plugin.Log.Info($"[CommandHandler] Global disable activated by {ctx?.SenderName}");
+                    GlobalDisableActive = true;
+                    SendResponse("Global Disable Activated", "!!All Surgeon commands disabled.");
+                }
+                else
+                {
+                    SendResponse("Already Disabled", "!!Surgeon is already disabled.");
+                }
+            }
             return true;
         }
 

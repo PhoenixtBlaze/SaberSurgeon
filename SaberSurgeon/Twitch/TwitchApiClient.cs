@@ -1,14 +1,19 @@
 ﻿using Newtonsoft.Json.Linq;
 using SaberSurgeon.UI.Controllers;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace SaberSurgeon.Twitch
 {
     public class TwitchApiClient
     {
         public static event Action OnSubscriberStatusChanged;
+
+        private static readonly Dictionary<string, Sprite> _spriteCache = new Dictionary<string, Sprite>();
 
         private static TwitchApiClient _instance;
         public static TwitchApiClient Instance
@@ -27,6 +32,69 @@ namespace SaberSurgeon.Twitch
 
         private const string HelixUrl = "https://api.twitch.tv/helix";
         //private const string ClientId = "dyq6orcrvl9cxd8d1usx6rtczt3tfb";
+
+        public static IEnumerator GetSpriteFromUrl(string url, Action<Sprite> callback)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                callback?.Invoke(null);
+                yield break;
+            }
+
+            // 1. Check Cache
+            if (_spriteCache.TryGetValue(url, out var cachedSprite))
+            {
+                if (cachedSprite != null)
+                {
+                    callback?.Invoke(cachedSprite);
+                    yield break;
+                }
+                else
+                {
+                    _spriteCache.Remove(url); // Clean dead entry
+                }
+            }
+
+            // 2. Download
+            using (var www = UnityEngine.Networking.UnityWebRequestTexture.GetTexture(url))
+            {
+                yield return www.SendWebRequest();
+
+                if (www.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    var texture = UnityEngine.Networking.DownloadHandlerTexture.GetContent(www);
+                    if (texture != null)
+                    {
+                        // Create Sprite
+                        var sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+
+                        // Add to cache
+                        _spriteCache[url] = sprite;
+
+                        callback?.Invoke(sprite);
+                    }
+                }
+                else
+                {
+                    // Log error sparingly
+                    callback?.Invoke(null);
+                }
+            }
+        }
+
+        // Call this on Plugin.OnApplicationQuit or Level Change to free memory
+        public static void ClearCache()
+        {
+            foreach (var sprite in _spriteCache.Values)
+            {
+                if (sprite != null && sprite.texture != null)
+                {
+                    UnityEngine.Object.Destroy(sprite.texture);
+                    UnityEngine.Object.Destroy(sprite);
+                }
+            }
+            _spriteCache.Clear();
+        }
 
         public async Task FetchBroadcasterAndSupportInfo()
         {

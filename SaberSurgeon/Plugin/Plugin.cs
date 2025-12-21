@@ -10,6 +10,7 @@ using IPA.Config.Stores;
 using IPA.Logging;
 using SaberSurgeon.Chat;
 using SaberSurgeon.Gameplay;
+using SaberSurgeon.Twitch;
 using SaberSurgeon.UI.FlowCoordinators;
 using SaberSurgeon.UI.Settings;
 using System;
@@ -166,44 +167,35 @@ namespace SaberSurgeon
 
         private IEnumerator RegisterMenuButtonWhenReady()
         {
-            // Try once per frame until MenuButtons is ready or we succeed
-            while (!_menuButtonRegisteredThisMenu)
+            int retries = 0;
+            const int MaxRetries = 300; // ~5-10 seconds depending on framerate
+
+            while (!_menuButtonRegisteredThisMenu && retries < MaxRetries)
             {
-                // Wait one frame to give Zenject / BSML time to finish installing
-                yield return null;
+                retries++;
+                yield return null; // Wait one frame
 
                 try
                 {
-                    // If BSML isn't fully initialized, this may throw – we just loop again
-                    if (MenuButtons.Instance == null)
-                        continue;
+                    if (MenuButtons.Instance == null) continue;
 
                     if (_menuButton == null)
                         _menuButton = new MenuButton("Saber Surgeon", "Open SaberSurgeon settings", ShowFlow);
 
                     MenuButtons.Instance.RegisterButton(_menuButton);
                     _menuButtonRegisteredThisMenu = true;
-
-                    Log.Info("SaberSurgeon: Menu button registered + (delayed)");
-
-                    /*
-                     
-                    // Create floating chat overlay once, when BSML is definitely ready
-                    if (_floatingChatOverlay == null)
-                        _floatingChatOverlay = SaberSurgeon.UI.FloatingChatOverlay.Create(); 
-                    */
+                    Log.Info("SaberSurgeon: Menu button registered.");
                 }
-                catch (System.InvalidOperationException ex)
+                catch (Exception ex)
                 {
-                    // "Tried getting MenuButtons too early!" – ignore and try again next frame
-                    Log.Debug($"SaberSurgeon: MenuButtons not ready yet: {ex.Message}");
+                    Log.Error($"SaberSurgeon: Error registering button: {ex.Message}");
+                    yield break; // Stop trying on error
                 }
-                catch (System.Exception ex)
-                {
-                    // Any unexpected error: log and stop trying this menu
-                    Log.Error($"SaberSurgeon: Unexpected error registering menu button: {ex}");
-                    yield break;
-                }
+            }
+
+            if (!_menuButtonRegisteredThisMenu)
+            {
+                Log.Warn("SaberSurgeon: Timed out waiting for MenuButtons.Instance");
             }
         }
 
@@ -274,6 +266,7 @@ namespace SaberSurgeon
 
             try
             {
+                TwitchApiClient.ClearCache();
                 BSEvents.menuSceneActive -= OnMenuSceneActive;
                 //BSMLSettings.Instance.RemoveSettingsMenu(PlayFirstSubmitLaterSettingsHost.Instance);
                 CommandHandler.Instance.Shutdown();

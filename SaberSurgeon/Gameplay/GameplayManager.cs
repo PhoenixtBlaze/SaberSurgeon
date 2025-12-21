@@ -50,7 +50,7 @@ namespace SaberSurgeon.Gameplay
         private readonly List<BeatmapLevel> _availableLevels = new List<BeatmapLevel>();
         private readonly List<string> _playedLevelIds = new List<string>();
 
-        private readonly Queue<SongRequest> _requestQueue = new Queue<SongRequest>();
+        
 
         // “recently requested/played” window for requeue blocking
         private readonly Queue<string> _recentRequestOrPlayHistory = new Queue<string>();
@@ -83,8 +83,8 @@ namespace SaberSurgeon.Gameplay
             public string LastError;
         }
 
-        private readonly Dictionary<string, PendingDownload> _pendingDownloads =
-            new Dictionary<string, PendingDownload>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentQueue<SongRequest> _requestQueue = new ConcurrentQueue<SongRequest>();
+        private readonly ConcurrentDictionary<string, PendingDownload> _pendingDownloads = new ConcurrentDictionary<string, PendingDownload>(StringComparer.OrdinalIgnoreCase);
 
         private Coroutine _downloadPollerCoroutine;
         private float _nextSongCoreRefreshTime;
@@ -144,13 +144,7 @@ namespace SaberSurgeon.Gameplay
 
         public bool PeekNextRequest(out SongRequest req)
         {
-            req = null;
-            if (_requestQueue.Count > 0)
-            {
-                req = _requestQueue.Peek();
-                return true;
-            }
-            return false;
+            return _requestQueue.TryPeek(out req);
         }
 
 
@@ -279,16 +273,15 @@ namespace SaberSurgeon.Gameplay
 
 
         public bool TryPrepareNextChain(
-        out BeatmapLevel nextLevel,
-        out BeatmapKey nextKey,
-        out GameplayModifiers modifiers,
-        out PlayerSpecificSettings playerSettings,
-        out ColorScheme color,
-        out EnvironmentsListModel envs)
+    out BeatmapLevel nextLevel,
+    out BeatmapKey nextKey,
+    out GameplayModifiers modifiers,
+    out PlayerSpecificSettings playerSettings,
+    out ColorScheme color,
+    out EnvironmentsListModel envs)
         {
             nextLevel = null;
             nextKey = default;
-
             modifiers = _capturedModifiers ?? CreateDefaultNoFailModifiers();
             playerSettings = _capturedPlayerSettings ?? new PlayerSpecificSettings();
             color = _capturedColorScheme;
@@ -297,26 +290,27 @@ namespace SaberSurgeon.Gameplay
             if (!_isPlaying)
                 return false;
 
-            // Keep pulling requests until we find one that is playable NOW.
-            // If a request isn't installed, start download once and keep it pending.
-            int safety = _requestQueue.Count; // avoid infinite loops in case queue is mutated
-            while (safety-- > 0 && _requestQueue.Count > 0)
+            // FIX: Use TryDequeue instead of Dequeue
+            int safety = _requestQueue.Count;
+            while (safety-- > 0 && !_requestQueue.IsEmpty)
             {
-                var req = _requestQueue.Dequeue();
-                if (req == null) continue;
-
-                if (TryResolveRequestToLevel(req, out var resolvedLevel))
+                if (_requestQueue.TryDequeue(out var req))
                 {
-                    _currentSongRequest = req;
-                    return BuildKeyForLevel(req, resolvedLevel, out nextLevel, out nextKey);
-                }
+                    if (req == null) continue;
 
-                // Not installed yet -> start download once, keep it pending, and re-enqueue.
-                EnsureDownloadStarted(req);
-                _requestQueue.Enqueue(req);
+                    if (TryResolveRequestToLevel(req, out var resolvedLevel))
+                    {
+                        _currentSongRequest = req;
+                        return BuildKeyForLevel(req, resolvedLevel, out nextLevel, out nextKey);
+                    }
+
+                    // Not installed yet -> ensure download started and re-enqueue
+                    EnsureDownloadStarted(req);
+                    _requestQueue.Enqueue(req);
+                }
             }
 
-            // No request playable right now -> random fallback.
+            // Random fallback
             _currentSongRequest = null;
             var random = GetRandomLevel();
             if (random == null)
@@ -324,6 +318,7 @@ namespace SaberSurgeon.Gameplay
 
             return BuildKeyForLevel(null, random, out nextLevel, out nextKey);
         }
+
 
         private bool BuildKeyForLevel(SongRequest req, BeatmapLevel level, out BeatmapLevel nextLevel, out BeatmapKey nextKey)
         {
@@ -502,27 +497,27 @@ namespace SaberSurgeon.Gameplay
 
         private void FinalizeDownloadedSong(PendingDownload pd, BeatmapLevel level)
         {
-            // 6) Add to playlist “Endless Mode”
             try
             {
+                // Add to playlist
                 var playlist = EndlessPlaylistService.GetOrCreate();
                 EndlessPlaylistService.AddLevel(playlist, level);
+
+                // FIX: Use TryRemove for ConcurrentDictionary
+                string key = NormalizeKey(pd.Request?.BsrCode);
+                _pendingDownloads.TryRemove(key, out _);
+
+                Plugin.Log.Info($"GameplayManager: Finalized {key} -> {level.songName}");
+
+                // Announce
+                Chat.ChatManager.GetInstance().SendChatMessage($"Downloaded & Ready: {pd.Request.BsrCode} ({level.songName})");
             }
             catch (Exception ex)
             {
-                Plugin.Log.Warn($"GameplayManager: Failed to add to playlist: {ex.Message}");
+                Plugin.Log.Error($"GameplayManager: Error finalizing song: {ex.Message}");
             }
-
-            // 7) If this request was meant to switch ASAP, arm a near-immediate switch
-            // If user didn’t specify, default to “switch asap once ready”.
-            bool shouldAutoSwitch =
-                pd.Request != null &&
-                (!pd.Request.SwitchAfterSeconds.HasValue || pd.Request.SwitchAfterSeconds.Value <= 0f);
-
-            if (shouldAutoSwitch)
-                _inLevelQueueProcessor?.ArmForCurrentSegment(0.1f);
-
         }
+
 
 
         private IEnumerator FetchBeatSaverHashCoroutine(string key, PendingDownload pd)
@@ -762,6 +757,7 @@ namespace SaberSurgeon.Gameplay
 
                 if (_requestQueue.Count > 0 && !_isLoadingSong)
                 {
+                    /*
                     var request = _requestQueue.Dequeue();
                     _currentSongRequest = request;
                     Plugin.Log.Info($"GameplayManager: Processing request {request.BsrCode}");
@@ -777,6 +773,7 @@ namespace SaberSurgeon.Gameplay
                     {
                         Plugin.Log.Warn($"GameplayManager: Requested song {request.BsrCode} not found");
                     }
+                    */
                 }
 
                 // If no request or request not found, pick random song
@@ -866,7 +863,7 @@ namespace SaberSurgeon.Gameplay
                             // Already resolved → remove from dictionary so we stop refreshing for it.
                             if (!string.IsNullOrWhiteSpace(pending.ResolvedLevelId))
                             {
-                                _pendingDownloads.Remove(key);
+                                _pendingDownloads.TryRemove(key, out _);
                                 continue;
                             }
 
@@ -888,7 +885,7 @@ namespace SaberSurgeon.Gameplay
                                 }
 
                                 // Now that it's resolved, we no longer need to track it here.
-                                _pendingDownloads.Remove(key);
+                                _requestQueue.TryDequeue(out _);
                             }
                         }
 
@@ -1151,6 +1148,7 @@ namespace SaberSurgeon.Gameplay
             }
         }
 
+        
 
         public void Shutdown()
         {
@@ -1201,6 +1199,7 @@ namespace SaberSurgeon.Gameplay
 
         public bool TryDequeueQueuedRequest(out SongRequest request)
         {
+            /*
             request = null;
             if (_requestQueue == null || _requestQueue.Count == 0) return false;
 
@@ -1219,7 +1218,8 @@ namespace SaberSurgeon.Gameplay
                 // Not playable yet → keep it in the queue.
                 _requestQueue.Enqueue(candidate);
             }
-
+            */
+            request = null;
             return false;
         }
 
