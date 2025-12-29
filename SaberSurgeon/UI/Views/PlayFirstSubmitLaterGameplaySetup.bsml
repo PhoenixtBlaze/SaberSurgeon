@@ -7,7 +7,7 @@
 
     <toggle-setting text="Enable module" value="enabled" apply-on-change="true"/>
     <toggle-setting text="Enable score submission" value="scoreSubmissionEnabled" apply-on-change="true"/>
-    <toggle-setting text="Auto-pause on map end" value="autoPauseOnMapEnd" apply-on-change="true"/>
+	  <toggle-setting text="Auto-pause on map end" value="autoPauseOnMapEnd" interactable="~isAutoPauseAvailable" apply-on-change="true"/>
     
   </vertical>
 </bg>

@@ -399,6 +399,7 @@
     <EmbeddedResource Include="Assets\Endless.png" />
     <Content Include="server.js" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>

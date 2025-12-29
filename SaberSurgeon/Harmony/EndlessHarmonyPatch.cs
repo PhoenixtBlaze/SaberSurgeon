@@ -5,19 +5,17 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using SaberSurgeon.Gameplay;
 
 namespace SaberSurgeon.HarmonyPatches
 {
-
-    // ==============================================================================================
     // PATCH 1: PlayFirstSubmitLater
-    // Blocks the "Finish" event so ScoreSaber/BeatLeader never hear about the map ending until we say so.
-    // ==============================================================================================
+    // Blocks the Finish event so ScoreSaber/BeatLeader never hear about the map ending until we say so.
     [HarmonyPatch(typeof(StandardLevelScenesTransitionSetupDataSO), "Finish")]
     internal static class PlayFirstSubmitLaterPatch
     {
-        private static bool _pauseGateActive;
-        private static bool _bypassPauseGateCall;
+        private static bool _pauseGateActive = false;
+        private static bool _bypassPauseGateCall = false;
 
         private static Action _continueDelegate;
         private static Action _resumeFinishedDelegate;
@@ -32,21 +30,36 @@ namespace SaberSurgeon.HarmonyPatches
         {
             if (results == null) return false;
 
-            var s = Plugin.Settings;
-            if (s == null) return false;
-            if (!s.PlayFirstSubmitLaterEnabled || !s.AutoPauseOnMapEnd) return false;
+            // 1. Native Multiplayer Check
+            if (BS_Utils.Plugin.LevelData.Mode == BS_Utils.Gameplay.Mode.Multiplayer)
+                return false;
 
-            var gm = Gameplay.GameplayManager.GetInstance();
-            // If Endless Mode is running and actively chaining, we DO NOT pause-gate.
-            // Endless mode handles its own transitions.
-            if (gm != null && gm.IsPlaying() && gm.GetRemainingTime() > 0f) return false;
-
-            if (results.levelEndAction == LevelCompletionResults.LevelEndAction.Quit ||
-                results.levelEndAction == LevelCompletionResults.LevelEndAction.Restart ||
-                results.levelEndStateType == LevelCompletionResults.LevelEndStateType.Failed)
+            // 2. BeatSaberPlus Multiplayer Check
+            bool isBSPlus = PlayFirstSubmitLaterManager.IsBSPlusMultiplayerActive();
+            if (isBSPlus)
             {
+                Plugin.Log.Info("PlayFirstSubmitLater: BS+ Multiplayer active. Skipping auto-pause.");
                 return false;
             }
+
+            var s = Plugin.Settings;
+            if (s == null) return false;
+
+            // Global Disable Check
+            if (!s.PlayFirstSubmitLaterEnabled || !s.AutoPauseOnMapEnd) return false;
+
+            // Endless Mode Check
+            var gm = Gameplay.GameplayManager.GetInstance();
+            if (gm != null && gm.IsPlaying() && gm.GetRemainingTime() > 0f) return false;
+
+            // Don't pause if user Quit or Restarted manually
+            if (results.levelEndAction == LevelCompletionResults.LevelEndAction.Quit ||
+                results.levelEndAction == LevelCompletionResults.LevelEndAction.Restart)
+                return false;
+
+            // Don't pause on Failure
+            if (results.levelEndStateType == LevelCompletionResults.LevelEndStateType.Failed)
+                return false;
 
             return true;
         }
@@ -60,7 +73,10 @@ namespace SaberSurgeon.HarmonyPatches
                 if (_menuDelegate != null) _pauseMenuManager.didPressMenuButtonEvent -= _menuDelegate;
                 if (_restartDelegate != null) _pauseMenuManager.didPressRestartButtonEvent -= _restartDelegate;
             }
-            _continueDelegate = _resumeFinishedDelegate = _menuDelegate = _restartDelegate = null;
+            _continueDelegate = null;
+            _resumeFinishedDelegate = null;
+            _menuDelegate = null;
+            _restartDelegate = null;
             _pauseMenuManager = null;
         }
 
@@ -85,7 +101,6 @@ namespace SaberSurgeon.HarmonyPatches
             try
             {
                 _bypassPauseGateCall = true;
-                // Re-call Finish(). This time bypass is true, so it falls through to original code.
                 _pendingSetup.Finish(_pendingResults);
             }
             finally
@@ -95,12 +110,7 @@ namespace SaberSurgeon.HarmonyPatches
             }
         }
 
-        private static void HandleAbort()
-        {
-            // If aborted, we just leave the pause gate active/cleared and let the game handle the Menu/Restart action
-            // normally triggered by the PauseMenu itself.
-            ClearPauseGate();
-        }
+        private static void HandleAbort() { ClearPauseGate(); }
 
         [HarmonyPrefix]
         [HarmonyPriority(Priority.High)]
@@ -125,6 +135,7 @@ namespace SaberSurgeon.HarmonyPatches
                     if (freshManager != null && pauseController != null)
                     {
                         _pauseMenuManager = freshManager;
+
                         _continueDelegate = HandleContinuePressed;
                         _resumeFinishedDelegate = HandleResumeFinished;
                         _menuDelegate = HandleAbort;
@@ -137,11 +148,16 @@ namespace SaberSurgeon.HarmonyPatches
 
                         pauseController.Pause();
                         _pauseMenuManager.ShowMenu();
+
                         Plugin.Log.Info("PlayFirstSubmitLater: Blocked score submission. Paused.");
 
-                        var continueButton = _pauseMenuManager.transform.Find("Wrapper/Container/Buttons/ContinueButton")?.GetComponent<Button>();
+                        var allButtons = _pauseMenuManager.GetComponentsInChildren<Button>(true);
+                        var continueButton = allButtons.FirstOrDefault(b => b.name == "ContinueButton");
+
                         if (continueButton && EventSystem.current != null)
+                        {
                             EventSystem.current.SetSelectedGameObject(continueButton.gameObject);
+                        }
                     }
                     else
                     {
@@ -149,7 +165,7 @@ namespace SaberSurgeon.HarmonyPatches
                         return true;
                     }
 
-                    return false; // STOP execution.
+                    return false; // Stop original execution
                 }
 
                 return true;
@@ -162,11 +178,7 @@ namespace SaberSurgeon.HarmonyPatches
         }
     }
 
-
-    // ==============================================================================================
     // PATCH 2: Endless Mode Chaining
-    // Handles replacing scenes for endless mode when the level is "officially" finished.
-    // ==============================================================================================
     [HarmonyPatch(typeof(MenuTransitionsHelper), "HandleMainGameSceneDidFinish")]
     internal static class EndlessHarmonyPatch
     {
@@ -174,12 +186,14 @@ namespace SaberSurgeon.HarmonyPatches
 
         [HarmonyPrefix]
         [HarmonyPriority(Priority.High)]
-        private static bool Prefix(MenuTransitionsHelper __instance, StandardLevelScenesTransitionSetupDataSO standardLevelScenesTransitionSetupData, LevelCompletionResults levelCompletionResults)
+        private static bool Prefix(
+            MenuTransitionsHelper __instance,
+            StandardLevelScenesTransitionSetupDataSO standardLevelScenesTransitionSetupData,
+            LevelCompletionResults levelCompletionResults)
         {
             var gm = Gameplay.GameplayManager.GetInstance();
             if (gm == null || !gm.IsPlaying() || gm.GetRemainingTime() <= 0f) return true;
 
-            // If we failed or quit, don't chain
             if (levelCompletionResults.levelEndAction == LevelCompletionResults.LevelEndAction.Quit ||
                 levelCompletionResults.levelEndAction == LevelCompletionResults.LevelEndAction.Restart ||
                 levelCompletionResults.levelEndStateType == LevelCompletionResults.LevelEndStateType.Failed)
@@ -189,8 +203,6 @@ namespace SaberSurgeon.HarmonyPatches
 
             try
             {
-                // We manually fire the finish callback so other mods (that hook this) know the level is done.
-                // Note: PlayFirstSubmitLater above might have delayed this call, but now we are here.
                 var finishedCBField = AccessTools.Field(typeof(MenuTransitionsHelper), "_standardLevelFinishedCallback");
                 var finishedCB = finishedCBField.GetValue(__instance);
                 (finishedCB as Delegate)?.DynamicInvoke(standardLevelScenesTransitionSetupData, levelCompletionResults);
@@ -201,7 +213,7 @@ namespace SaberSurgeon.HarmonyPatches
                 }
 
                 ReplaceScenes(__instance, nextLevel, nextKey, modifiers, playerSettings, color, envs);
-                return false; // STOP the game from going to the menu/results screen
+                return false;
             }
             catch (Exception ex)
             {
@@ -215,26 +227,25 @@ namespace SaberSurgeon.HarmonyPatches
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
         }
 
-        internal static void ReplaceScenes(MenuTransitionsHelper helper, BeatmapLevel nextLevel, BeatmapKey nextKey, GameplayModifiers modifiers, PlayerSpecificSettings playerSettings, ColorScheme color, EnvironmentsListModel envs, float fade = ChainFadeDurationSeconds)
+        internal static void ReplaceScenes(
+            MenuTransitionsHelper helper,
+            BeatmapLevel nextLevel,
+            BeatmapKey nextKey,
+            GameplayModifiers modifiers,
+            PlayerSpecificSettings playerSettings,
+            ColorScheme color,
+            EnvironmentsListModel envs,
+            float fade = ChainFadeDurationSeconds)
         {
-            // (Same implementation as before)
-            // ... Copy your ReplaceScenes implementation here ...
-            // For brevity, I am assuming you have the method body from previous steps.
-            // Just paste the method body from the previous "EndlessHarmonyPatch" here.
             if (helper == null || nextLevel == null || envs == null) return;
             ClearPreviousPauseState();
 
-            // Reflection helpers
+            // Reflection Helpers
             FieldInfo FindField(Type t, params string[] names)
             {
-                foreach (var n in names)
-                {
-                    var f = AccessTools.Field(t, n);
-                    if (f != null) return f;
-                }
+                foreach (var n in names) { var f = AccessTools.Field(t, n); if (f != null) return f; }
                 return null;
             }
-
             T GetFieldValue<T>(object instance, params string[] names) where T : class
             {
                 if (instance == null) return null;
@@ -242,18 +253,16 @@ namespace SaberSurgeon.HarmonyPatches
                 return f?.GetValue(instance) as T;
             }
 
-            var scenesMgr = GetFieldValue<GameScenesManager>(helper, "gameScenesManager", "_gameScenesManager");
-            var audioLoader = GetFieldValue<AudioClipAsyncLoader>(helper, "audioClipAsyncLoader", "_audioClipAsyncLoader");
-            var settingsMgr = GetFieldValue<SettingsManager>(helper, "settingsManager", "_settingsManager");
-            var dataLoader = GetFieldValue<BeatmapDataLoader>(helper, "beatmapDataLoader", "_beatmapDataLoader");
-            var entitlement = GetFieldValue<BeatmapLevelsEntitlementModel>(helper, "beatmapLevelsEntitlementModel", "_beatmapLevelsEntitlementModel");
-            var levelsModel = GetFieldValue<BeatmapLevelsModel>(helper, "beatmapLevelsModel", "_beatmapLevelsModel");
+            var scenesMgr = GetFieldValue<GameScenesManager>(helper, "_gameScenesManager", "gameScenesManager");
+            var audioLoader = GetFieldValue<AudioClipAsyncLoader>(helper, "_audioClipAsyncLoader", "audioClipAsyncLoader");
+            var settingsMgr = GetFieldValue<SettingsManager>(helper, "_settingsManager", "settingsManager");
+            var dataLoader = GetFieldValue<BeatmapDataLoader>(helper, "_beatmapDataLoader", "beatmapDataLoader");
+            var entitlement = GetFieldValue<BeatmapLevelsEntitlementModel>(helper, "_beatmapLevelsEntitlementModel", "beatmapLevelsEntitlementModel");
+            var levelsModel = GetFieldValue<BeatmapLevelsModel>(helper, "_beatmapLevelsModel", "beatmapLevelsModel");
 
             if (scenesMgr == null) return;
 
-            var existingSetup = GetFieldValue<StandardLevelScenesTransitionSetupDataSO>(
-                helper, "standardLevelScenesTransitionSetupData", "_standardLevelScenesTransitionSetupData");
-
+            var existingSetup = GetFieldValue<StandardLevelScenesTransitionSetupDataSO>(helper, "_standardLevelScenesTransitionSetupData", "standardLevelScenesTransitionSetupData");
             if (existingSetup == null) return;
 
             var stdGameplayInfoField = FindField(typeof(StandardLevelScenesTransitionSetupDataSO), "_standardGameplaySceneInfo", "standardGameplaySceneInfo");
@@ -265,30 +274,13 @@ namespace SaberSurgeon.HarmonyPatches
             var existingGameCoreInfo = gameCoreInfoField.GetValue(existingSetup) as SceneInfo;
 
             var newSetup = ScriptableObject.CreateInstance<StandardLevelScenesTransitionSetupDataSO>();
+
             stdGameplayInfoField.SetValue(newSetup, existingStdGameplayInfo);
             gameCoreInfoField.SetValue(newSetup, existingGameCoreInfo);
 
             newSetup.Init(
-                gameMode: "Solo",
-                beatmapKey: nextKey,
-                beatmapLevel: nextLevel,
-                overrideEnvironmentSettings: null,
-                playerOverrideColorScheme: color,
-                playerOverrideLightshowColors: false,
-                beatmapOverrideColorScheme: null,
-                gameplayModifiers: modifiers,
-                playerSpecificSettings: playerSettings,
-                practiceSettings: null,
-                environmentsListModel: envs,
-                audioClipAsyncLoader: audioLoader,
-                beatmapDataLoader: dataLoader,
-                settingsManager: settingsMgr,
-                backButtonText: "Menu",
-                beatmapLevelsModel: levelsModel,
-                beatmapLevelsEntitlementModel: entitlement,
-                useTestNoteCutSoundEffects: false,
-                startPaused: false,
-                recordingToolData: null
+                "Solo", nextKey, nextLevel, null, color, false, null, modifiers, playerSettings, null, envs,
+                audioLoader, dataLoader, settingsMgr, "Menu", levelsModel, entitlement, false, false, null
             );
 
             Plugin.Log.Info($"EndlessHarmonyPatch: Replacing scenes -> {nextLevel.songName}");

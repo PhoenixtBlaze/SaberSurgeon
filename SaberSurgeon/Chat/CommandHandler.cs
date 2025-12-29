@@ -354,7 +354,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "NoteColor command is disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false;
             }
 
@@ -397,7 +397,7 @@ namespace SaberSurgeon.Chat
 
                 SendResponse(
                     $"NoteColor rainbow mode started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
-                    null);
+                    "!!Rainbow Started");
                 return true;
             }
 
@@ -612,7 +612,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "Flashbang command disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false;
             }
 
@@ -647,7 +647,7 @@ namespace SaberSurgeon.Chat
 
             SendResponse(
                 $"Flashbang triggered (requested by {ctx?.SenderName ?? "Unknown"})",
-                null);
+                "!!Flashbang Warning");
             return true; // success → cooldown applies
         }
 
@@ -659,7 +659,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "Faster command is disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false;
             }
 
@@ -705,7 +705,7 @@ namespace SaberSurgeon.Chat
 
             SendResponse(
                 $"Faster started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
-                null);
+                "!!Starting Faster Song");
             return true;
         }
 
@@ -716,7 +716,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "SuperFast command is disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false;
             }
 
@@ -762,7 +762,7 @@ namespace SaberSurgeon.Chat
 
             SendResponse(
                 $"SuperFast started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
-                null);
+                "!!Starting SuperFast Song");
             return true;
         }
 
@@ -773,7 +773,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "Slower command is disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false;
             }
             if (GlobalDisableActive)
@@ -817,7 +817,7 @@ namespace SaberSurgeon.Chat
 
             SendResponse(
                 $"Slower started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
-                null);
+                "!!Starting Slower Song");
             return true;
         }
 
@@ -829,7 +829,7 @@ namespace SaberSurgeon.Chat
             if (!BombEnabled)
             {
                 SendResponse(
-                    "Bomb command disabled via menu", null);
+                    "Bomb command disabled via menu", "Command Disabled");
                 return false;
             }
 
@@ -876,7 +876,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "DisappearingArrows command disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false; // no cooldown
             }
 
@@ -918,7 +918,7 @@ namespace SaberSurgeon.Chat
 
             SendResponse(
                 $"Disappearing arrows started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
-                null);
+                "!!Who needs to see arrows anyway!");
 
             return true; // effect actually started → apply cooldown
         }
@@ -932,7 +932,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "Ghost command disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false;
             }
             if (GlobalDisableActive)
@@ -974,7 +974,7 @@ namespace SaberSurgeon.Chat
 
             SendResponse(
                 $"Ghost notes started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
-                null);
+                "!!Blocks? What Blocks? There's only Arrows!");
 
             return true;
         }
@@ -993,7 +993,7 @@ namespace SaberSurgeon.Chat
             {
                 SendResponse(
                     "Rainbow command is disabled via menu",
-                    null);
+                    "Command Disabled");
                 return false;
             }
             // Check if global disable is active
@@ -1027,7 +1027,7 @@ namespace SaberSurgeon.Chat
 
             SendResponse(
                 $"Rainbow started for 30s (requested by {ctx?.SenderName ?? "Unknown"})",
-                null);
+                "!!All The Colours!");
 
             return true;
         }

@@ -128,6 +128,8 @@ namespace SaberSurgeon
             _pfslTabRegistered = true;
         }
 
+
+        
         private IEnumerator RegisterPfslGameplaySetupTabWhenReady()
         {
             while (!pfslTabRegisteredThisMenu)
@@ -165,7 +167,7 @@ namespace SaberSurgeon
                 }
             }
         }
-
+        
 
         private IEnumerator RegisterMenuButtonWhenReady()
         {
@@ -270,7 +272,7 @@ namespace SaberSurgeon
             {
                 TwitchApiClient.ClearCache();
                 BSEvents.menuSceneActive -= OnMenuSceneActive;
-                //BSMLSettings.Instance.RemoveSettingsMenu(PlayFirstSubmitLaterSettingsHost.Instance);
+                BSMLSettings.Instance.RemoveSettingsMenu(PlayFirstSubmitLaterSettingsHost.Instance);
                 CommandHandler.Instance.Shutdown();
                 ChatManager.GetInstance().Shutdown();
                 Gameplay.GameplayManager.GetInstance().Shutdown();

@@ -5,11 +5,9 @@ using System.Runtime.CompilerServices;
 
 namespace SaberSurgeon.UI.Settings
 {
-    // Plain POCO + INotifyPropertyChanged. Works for BSML GameplaySetup tabs.
     internal sealed class PlayFirstSubmitLaterSettingsHost : INotifyPropertyChanged
     {
         private static PlayFirstSubmitLaterSettingsHost _instance;
-
         public static PlayFirstSubmitLaterSettingsHost Instance
         {
             get
@@ -20,9 +18,7 @@ namespace SaberSurgeon.UI.Settings
             }
         }
 
-
         public event PropertyChangedEventHandler PropertyChanged;
-
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
@@ -35,6 +31,7 @@ namespace SaberSurgeon.UI.Settings
                 if (Plugin.Settings != null) Plugin.Settings.PlayFirstSubmitLaterEnabled = value;
                 NotifyPropertyChanged();
                 NotifyPropertyChanged(nameof(StatusText));
+                NotifyPropertyChanged(nameof(IsAutoPauseAvailable)); // Update availability if master toggle changes
             }
         }
 
@@ -65,8 +62,26 @@ namespace SaberSurgeon.UI.Settings
                 NotifyPropertyChanged();
             }
         }
-         
-        
+
+        // FIX: Check if we are in Multiplayer to disable the toggle visual
+        [UIValue("isAutoPauseAvailable")]
+        public bool IsAutoPauseAvailable
+        {
+            get
+            {
+                if (!Enabled) return false;
+
+                // Native Multiplayer check
+                if (BS_Utils.Plugin.LevelData.Mode == BS_Utils.Gameplay.Mode.Multiplayer)
+                    return false;
+
+                // BeatSaberPlus Multiplayer check
+                if (PlayFirstSubmitLaterManager.IsBSPlusMultiplayerActive())
+                    return false;
+
+                return true;
+            }
+        }
 
         [UIValue("statusText")]
         public string StatusText

@@ -86,7 +86,7 @@
 					  font-size="4"
 					  pref-width="15" />
 
-				<!-- Editable text field -->
+				<!--  
 				<string-setting
 					text=""
 					value="rainbow_command"
@@ -94,7 +94,7 @@
 					apply-on-change="true"
 					pref-width="15"
 					hover-hint="command to use for RGB/Rainbow notes" />
-
+				-->
 				<!-- Increment for the numeric value -->
 				<increment-setting
 					text=""

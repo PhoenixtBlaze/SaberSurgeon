@@ -3,26 +3,19 @@ using System;
 using System.Linq;
 using UnityEngine;
 using BS_Utils.Utilities;
-
+using System.Reflection;
 
 namespace SaberSurgeon.Gameplay
 {
-    /// <summary>
-    /// Standalone PlayFirst SubmitLater Manager.
-    /// Works completely independently from all other Saber Surgeon systems.
-    /// Manages score submission state and auto-pause behavior.
-    /// </summary>
     public class PlayFirstSubmitLaterManager : MonoBehaviour
     {
         private static PlayFirstSubmitLaterManager _instance;
         private static GameObject _go;
         private const string SubmissionKey = "SaberSurgeon: SubmitLater";
 
-
         // Feature state
         private bool _submissionDisabled = false;
         private bool _autoPauseTriggered = false;
-        private PauseMenuManager _pauseMenuManager;
 
         public static bool SubmissionDisabled =>
             _instance != null && _instance._submissionDisabled;
@@ -45,15 +38,65 @@ namespace SaberSurgeon.Gameplay
             }
         }
 
+        /// <summary>
+        /// Robustly detects if BeatSaberPlus Multiplayer is active.
+        /// </summary>
+        public static bool IsBSPlusMultiplayerActive()
+        {
+            try
+            {
+                // 1. Check BS_Utils Isolation (Fastest)
+                if (BS_Utils.Gameplay.Gamemode.IsIsolatedLevel)
+                {
+                    var mod = BS_Utils.Gameplay.Gamemode.IsolatingMod ?? "";
+                    if (mod.IndexOf("BeatSaberPlus", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true;
+                }
+
+                // 2. Check for the specific BS+ MP Assembly
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                var mpAssembly = assemblies.FirstOrDefault(a => a.GetName().Name == "BeatSaberPlus_Multiplayer");
+
+                if (mpAssembly != null)
+                {
+                    // If the assembly exists, check if we are in a networked state
+                    // The safest way is to check for the singleton "Instance" of the MultiplayerController or NetworkManager
+                    var controllerType = mpAssembly.GetType("BeatSaberPlus.Multiplayer.MultiplayerController");
+
+                    if (controllerType != null)
+                    {
+                        // Check static 'Instance'
+                        var instanceProp = controllerType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
+                        if (instanceProp != null)
+                        {
+                            var instance = instanceProp.GetValue(null);
+                            if (instance != null)
+                            {
+                                // Check if the instance is active/enabled (it's a MonoBehaviour)
+                                var mb = instance as MonoBehaviour;
+                                if (mb != null && mb.isActiveAndEnabled)
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Warn($"PlayFirstSubmitLater: Error checking for BS+ MP: {ex.Message}");
+            }
+
+            return false;
+        }
+
         private void OnEnable()
         {
             try
             {
                 BSEvents.gameSceneLoaded += HandleGameSceneLoaded;
-
-                // Optional: treat restart as a "new start" (usually fine)
                 BSEvents.levelRestarted += HandleLevelRestarted;
-
                 Plugin.Log.Info("PlayFirstSubmitLater: BS_Utils events hooked");
             }
             catch (Exception ex)
@@ -65,30 +108,27 @@ namespace SaberSurgeon.Gameplay
         private void OnDisable()
         {
             BSEvents.gameSceneLoaded -= HandleGameSceneLoaded;
-
             BSEvents.levelRestarted -= HandleLevelRestarted;
         }
 
-
-        /// <summary>
-        /// STANDALONE: Disable score submission (works without any other mod).
-        /// </summary>
         public static void DisableSubmission()
         {
             if (!IsFeatureEnabled) return;
             if (_instance == null) return;
 
+            // Block disabling if in any Multiplayer mode
+            if (BS_Utils.Plugin.LevelData.Mode == Mode.Multiplayer || IsBSPlusMultiplayerActive())
+            {
+                Plugin.Log.Warn("PlayFirstSubmitLater: DisableSubmission ignored (Multiplayer detected)");
+                return;
+            }
+
             _instance._submissionDisabled = true;
             Plugin.Settings.ScoreSubmissionEnabled = false;
-
-            // Reversible disable (needed for a pause-menu toggle)
             ScoreSubmission.ProlongedDisableSubmission(SubmissionKey);
             Plugin.Log.Info("PlayFirstSubmitLater: Score submission DISABLED (prolonged)");
         }
 
-        /// <summary>
-        /// STANDALONE: Re-enable score submission.
-        /// </summary>
         public static void EnableSubmission()
         {
             if (!IsFeatureEnabled) return;
@@ -96,76 +136,52 @@ namespace SaberSurgeon.Gameplay
 
             _instance._submissionDisabled = false;
             Plugin.Settings.ScoreSubmissionEnabled = true;
-
-            // Re-enable by removing ONLY our disable reason
             ScoreSubmission.RemoveProlongedDisable(SubmissionKey);
-            Plugin.Log.Info("PlayFirstSubmitLater: Score submission ENABLED(removed prolonged disable)");
+            Plugin.Log.Info("PlayFirstSubmitLater: Score submission ENABLED (removed prolonged disable)");
         }
 
-        /// <summary>
-        /// STANDALONE: Toggle submission state.
-        /// </summary>
         public static void ToggleSubmission()
         {
             if (!IsFeatureEnabled) return;
-
-            if (SubmissionDisabled)
-                EnableSubmission();
-            else
-                DisableSubmission();
+            if (SubmissionDisabled) EnableSubmission();
+            else DisableSubmission();
         }
 
-        /// <summary>
-        /// STANDALONE: Called when map ends to trigger auto-pause if enabled.
-        /// </summary>
-        
-
-        /// <summary>
-        /// STANDALONE: Reset state when new map starts.
-        /// </summary>
         public void OnMapStarted()
         {
             if (!IsFeatureEnabled) return;
 
+            // Debug Logging for troubleshooting
+            bool isNative = BS_Utils.Plugin.LevelData.Mode == Mode.Multiplayer;
+            bool isBSPlus = IsBSPlusMultiplayerActive();
+            Plugin.Log.Info($"PlayFirstSubmitLater: Map Started. Mode Check -> NativeMP: {isNative}, BS+MP: {isBSPlus}");
+
+            // FORCE ENABLE if in ANY Multiplayer mode
+            if (isNative || isBSPlus)
+            {
+                Plugin.Log.Info("PlayFirstSubmitLater: Multiplayer detected. Forcing submission ON.");
+                if (_submissionDisabled || !Plugin.Settings.ScoreSubmissionEnabled)
+                {
+                    EnableSubmission();
+                }
+                return;
+            }
+
             _autoPauseTriggered = false;
 
-            // Reset to config setting when new map starts
+            // Standard Solo behavior
             if (Plugin.Settings.ScoreSubmissionEnabled && _submissionDisabled)
                 EnableSubmission();
         }
 
-
-
-        /// <summary>
-        /// STANDALONE: Reset all state.
-        /// </summary>
         public static void ResetState()
         {
             if (_instance == null) return;
-
             _instance._autoPauseTriggered = false;
-            Plugin.Log.Debug("PlayFirstSubmitLater: State reset");
         }
 
-        public void OnDestroy()
-        {
-            _instance = null;
-        }
-
-
-        private void HandleGameSceneLoaded()
-        {
-            // Called when gameplay scene is ready
-            OnMapStarted();
-        }
-
-
-        private void HandleLevelRestarted(StandardLevelScenesTransitionSetupDataSO data, LevelCompletionResults results)
-        {
-            // Treat restart as "new run starting"
-            OnMapStarted();
-        }
-
-
+        public void OnDestroy() { _instance = null; }
+        private void HandleGameSceneLoaded() { OnMapStarted(); }
+        private void HandleLevelRestarted(StandardLevelScenesTransitionSetupDataSO data, LevelCompletionResults results) { OnMapStarted(); }
     }
 }
